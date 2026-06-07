@@ -3,110 +3,810 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Analyzer - Finnhub API + Portfolio</title>
+    <title>Stock Analyzer</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #0a0e17;
+            --surface: #111827;
+            --surface2: #1a2235;
+            --border: #1f2d44;
+            --accent: #00d4ff;
+            --accent2: #7c3aed;
+            --green: #00e676;
+            --red: #ff1744;
+            --text: #e2e8f0;
+            --text-dim: #64748b;
+            --mono: 'IBM Plex Mono', monospace;
+            --sans: 'Heebo', sans-serif;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; padding: 20px;
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px 16px;
+            background-image:
+                radial-gradient(ellipse at 10% 0%, rgba(0,212,255,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 100%, rgba(124,58,237,0.06) 0%, transparent 50%);
         }
-        .container { max-width: 1200px; margin: 0 auto; }
-        h1 {
-            color: white; text-align: center; margin-bottom: 30px;
-            font-size: 2.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        /* Header */
+        .header {
+            display: flex; align-items: center; gap: 14px;
+            margin-bottom: 32px; padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
         }
-        .search-box {
-            background: white; padding: 20px; border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 30px; display: flex; gap: 10px; flex-wrap: wrap;
+        .header-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
         }
-        input[type="text"], input[type="number"] {
-            flex: 1; min-width: 200px; padding: 15px;
-            border: 2px solid #ddd; border-radius: 10px;
-            font-size: 16px; transition: border-color 0.3s;
+        .header h1 {
+            font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px;
         }
-        input[type="text"]:focus, input[type="number"]:focus { outline: none; border-color: #667eea; }
-        button {
-            padding: 15px 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white; border: none; border-radius: 10px;
-            font-size: 16px; cursor: pointer; transition: transform 0.2s; font-weight: bold;
+        .header .subtitle {
+            font-size: 0.8rem; color: var(--text-dim);
+            font-family: var(--mono);
         }
-        button:hover { transform: translateY(-2px); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.danger { background: #e74c3c; }
-        button.success { background: #27ae60; }
-        .api-key-input { width: 100%; margin-bottom: 15px; }
-        .stock-info {
-            background: white; padding: 20px; border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px;
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;
-        }
-        .info-card {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            padding: 20px; border-radius: 10px; text-align: center;
-        }
-        .info-card h3 { color: #667eea; margin-bottom: 10px; font-size: 14px; }
-        .info-card .value { font-size: 24px; font-weight: bold; color: #333; }
-        .info-card .value.positive { color: #27ae60; }
-        .info-card .value.negative { color: #e74c3c; }
-        .info-card .value.small { font-size: 18px; }
-        #chart {
-            background: white; padding: 20px; border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px; height: 600px;
-        }
-        .news-section {
-            background: white; padding: 20px; border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        .news-section h2, .portfolio-section h2, .alert-section h2 { color: #667eea; margin-bottom: 20px; }
-        .news-item {
-            background: #f8f9fa; padding: 15px; border-radius: 10px;
-            margin-bottom: 10px; border-right: 4px solid #667eea;
-        }
-        .news-item h4 { color: #333; margin-bottom: 10px; }
-        .news-item .sentiment {
-            display: inline-block; padding: 5px 10px; border-radius: 5px;
-            font-size: 12px; font-weight: bold; margin-right: 10px;
-        }
-        .sentiment.positive { background: #d4edda; color: #155724; }
-        .sentiment.negative { background: #f8d7da; color: #721c24; }
-        .sentiment.neutral { background: #e2e3e5; color: #383d41; }
-        .sentiment-score {
-            text-align: center; padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 15px; color: white; margin-bottom: 20px;
-        }
-        .sentiment-score .overall { font-size: 2em; font-weight: bold; margin-bottom: 10px; }
-        .error {
-            background: #f8d7da; color: #721c24; padding: 15px;
-            border-radius: 10px; margin-bottom: 20px;
-        }
+
+        /* Hint */
         .hint {
-            background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;
-            color: white; margin-bottom: 20px; font-size: 14px;
+            background: rgba(0,212,255,0.07);
+            border: 1px solid rgba(0,212,255,0.2);
+            padding: 12px 16px; border-radius: 8px;
+            font-size: 13px; color: var(--text-dim);
+            margin-bottom: 20px;
         }
-        .hint a { color: #ffd700; font-weight: bold; }
-        
-        /* Portfolio section */
-        .portfolio-section {
-            background: white; padding: 20px; border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px;
+        .hint a { color: var(--accent); text-decoration: none; font-weight: 600; }
+
+        /* Search */
+        .search-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 20px; border-radius: 12px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 12px;
         }
-        .portfolio-form {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px; margin-bottom: 15px;
+        @media (max-width: 600px) {
+            .search-box { grid-template-columns: 1fr; }
         }
-        .portfolio-form input, .portfolio-form select {
-            padding: 12px; border: 2px solid #ddd; border-radius: 8px;
+        .api-key-row {
+            grid-column: 1 / -1;
+        }
+
+        input[type="text"], input[type="number"], input[type="password"], select {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
             font-size: 14px;
+            font-family: var(--sans);
+            transition: border-color 0.2s;
         }
+        input::placeholder { color: var(--text-dim); }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0,212,255,0.08);
+        }
+        select option { background: var(--surface2); }
+
+        button {
+            padding: 12px 24px;
+            background: var(--accent);
+            color: #000;
+            border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            white-space: nowrap;
+            font-family: var(--sans);
+        }
+        button:hover { opacity: 0.85; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+        button.danger { background: var(--red); color: #fff; }
+        button.success { background: var(--green); color: #000; }
+        button.sm {
+            padding: 6px 12px; font-size: 12px; border-radius: 6px;
+        }
+
+        /* Error */
+        .error {
+            background: rgba(255,23,68,0.1);
+            border: 1px solid rgba(255,23,68,0.3);
+            color: #ff6b8a;
+            padding: 12px 16px; border-radius: 8px;
+            margin-bottom: 16px; font-size: 14px;
+            display: none;
+        }
+
+        /* Stock info cards */
+        .stock-info {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 700px) { .stock-info { grid-template-columns: repeat(2, 1fr); } }
+
+        .info-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 10px;
+        }
+        .info-card h3 {
+            font-size: 11px; font-weight: 400;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+            font-family: var(--mono);
+        }
+        .info-card .value {
+            font-size: 22px; font-weight: 700;
+            font-family: var(--mono);
+            color: var(--text);
+        }
+        .info-card .value.positive { color: var(--green); }
+        .info-card .value.negative { color: var(--red); }
+        .info-card .value.small { font-size: 16px; }
+
+        /* Sentiment */
+        .sentiment-score {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .sentiment-score .label {
+            font-size: 11px; color: var(--text-dim);
+            text-transform: uppercase; letter-spacing: 0.8px;
+            font-family: var(--mono);
+        }
+        .sentiment-score .overall {
+            font-size: 18px; font-weight: 700;
+            font-family: var(--mono);
+            color: var(--accent);
+        }
+
+        /* Chart */
+        #chart {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            height: 520px;
+        }
+
+        /* Sections */
+        .section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            font-size: 14px; font-weight: 700;
+            color: var(--text);
+            margin-bottom: 18px;
+            display: flex; align-items: center; gap: 8px;
+            letter-spacing: 0.3px;
+        }
+        .section h2 .icon { font-size: 16px; }
+
+        /* Portfolio form */
+        .portfolio-form, .alert-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Portfolio items */
         .portfolio-item {
-            background: #f8f9fa; padding: 15px; border-radius: 10px;
-            margin-bottom: 10px; display: flex; justify-content: space-between;
-            align-items: center; border-right: 4px solid #667eea;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-right: 3px solid var(--accent2);
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         .portfolio-item .portfolio-info { flex: 1; }
-        .portfolio-item .portfolio-sy
+        .portfolio-item .portfolio-symbol {
+            font-size: 15px; font-weight: 700;
+            font-family: var(--mono);
+        }
+        .portfolio-item .portfolio-details {
+            font-size: 12px; color: var(--text-dim);
+            margin-top: 3px; font-family: var(--mono);
+        }
+        .portfolio-item .portfolio-value {
+            font-size: 16px; font-weight: 700;
+            font-family: var(--mono);
+            color: var(--accent);
+        }
+
+        /* Portfolio summary */
+        .portfolio-summary {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .summary-item .label {
+            font-size: 10px; color: var(--text-dim);
+            text-transform: uppercase; letter-spacing: 0.8px;
+            font-family: var(--mono);
+            margin-bottom: 6px;
+        }
+        .summary-item .value {
+            font-size: 20px; font-weight: 700;
+            font-family: var(--mono);
+        }
+
+        /* Alerts */
+        .alert-toggle {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 16px;
+            font-size: 13px; color: var(--text-dim);
+        }
+        .alert-toggle input[type="checkbox"] {
+            width: 16px; height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .alert-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-right: 3px solid var(--text-dim);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .alert-item.active { border-right-color: var(--green); }
+        .alert-item .alert-info { flex: 1; }
+        .alert-item .alert-price {
+            font-size: 14px; font-weight: 700;
+            font-family: var(--mono);
+        }
+        .alert-item .alert-target {
+            font-size: 12px; color: var(--text-dim);
+            font-family: var(--mono); margin-top: 2px;
+        }
+
+        /* News */
+        .news-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-right: 3px solid var(--accent);
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .news-item h4 {
+            font-size: 13px; font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        .news-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .badge {
+            display: inline-block; padding: 3px 8px;
+            border-radius: 4px; font-size: 11px;
+            font-weight: 700; font-family: var(--mono);
+        }
+        .badge.positive { background: rgba(0,230,118,0.15); color: var(--green); }
+        .badge.negative { background: rgba(255,23,68,0.15); color: var(--red); }
+        .badge.neutral { background: rgba(100,116,139,0.2); color: var(--text-dim); }
+        .news-date { font-size: 11px; color: var(--text-dim); font-family: var(--mono); }
+        .news-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+        .news-link:hover { text-decoration: underline; }
+
+        .empty-state {
+            text-align: center; color: var(--text-dim);
+            font-size: 13px; padding: 20px 0;
+        }
+
+        /* Spinner */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <div class="header">
+            <div class="header-icon">📈</div>
+            <div>
+                <h1>Stock Analyzer</h1>
+                <div class="subtitle">Finnhub API · Portfolio · Alerts</div>
+            </div>
+        </div>
+
+        <div class="hint">
+            🔑 API Key חינמי: <a href="https://finnhub.io/pricing" target="_blank">finnhub.io</a>
+            &nbsp;·&nbsp; 60 בקשות/דקה · 500/יום
+        </div>
+
+        <div class="search-box">
+            <div class="api-key-row">
+                <input type="password" id="apiKey" placeholder="Finnhub API Key">
+            </div>
+            <input type="text" id="symbol" placeholder="סימול: AAPL, TSLA, MSFT...">
+            <div></div>
+            <button onclick="loadStock()" id="loadBtn">טען נתונים</button>
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <!-- Stock Info -->
+        <div id="stockInfo" class="stock-info" style="display:none">
+            <div class="info-card">
+                <h3>מחיר נוכחי</h3>
+                <div class="value" id="currentPrice">—</div>
+            </div>
+            <div class="info-card">
+                <h3>שינוי ($)</h3>
+                <div class="value" id="change">—</div>
+            </div>
+            <div class="info-card">
+                <h3>שינוי (%)</h3>
+                <div class="value" id="percentChange">—</div>
+            </div>
+            <div class="info-card">
+                <h3>RSI (14)</h3>
+                <div class="value" id="rsi">—</div>
+            </div>
+        </div>
+
+        <!-- Sentiment -->
+        <div id="sentimentScore" class="sentiment-score" style="display:none">
+            <div>
+                <div class="label">סנטימנט כללי</div>
+                <div class="overall" id="sentimentValue">—</div>
+            </div>
+        </div>
+
+        <!-- Portfolio -->
+        <div class="section">
+            <h2><span class="icon">💼</span> Portfolio</h2>
+            <div class="portfolio-form">
+                <input type="text" id="portfolioSymbol" placeholder="סימול">
+                <input type="number" id="portfolioShares" placeholder="כמות מניות" min="0" step="any">
+                <input type="number" id="portfolioBuyPrice" placeholder="מחיר קנייה" min="0" step="any">
+                <button class="success" onclick="addToPortfolio()">+ הוסף</button>
+            </div>
+            <div id="portfolioList"><p class="empty-state">אין מניות ב-Portfolio</p></div>
+            <div class="portfolio-summary" id="portfolioSummary" style="display:none">
+                <div class="summary-item">
+                    <div class="label">ערך נוכחי</div>
+                    <div class="value" id="totalValue">$0</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">השקעה</div>
+                    <div class="value" id="totalInvested">$0</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">תשואה</div>
+                    <div class="value" id="totalReturn">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="section">
+            <h2><span class="icon">🔔</span> התראות מחיר</h2>
+            <div class="alert-toggle">
+                <input type="checkbox" id="enableNotifications" onchange="handleEnableNotifications()">
+                <label for="enableNotifications">אפשר התראות בדפדפן</label>
+            </div>
+            <div class="alert-form">
+                <input type="number" id="alertPrice" placeholder="מחיר נוכחי" step="any">
+                <input type="number" id="alertTarget" placeholder="מחיר יעד" step="any">
+                <select id="alertType">
+                    <option value="above">אם מחיר > יעד</option>
+                    <option value="below">אם מחיר &lt; יעד</option>
+                </select>
+                <button onclick="addAlert()">+ הוסף התראה</button>
+            </div>
+            <div id="alertsList"><p class="empty-state">אין התראות</p></div>
+        </div>
+
+        <!-- Chart -->
+        <div id="chart" style="display:none"></div>
+
+        <!-- News -->
+        <div class="section" id="newsSection" style="display:none">
+            <h2><span class="icon">📰</span> חדשות אחרונות</h2>
+            <div id="newsList"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // ─── Init ───────────────────────────────────────────────
+        const savedKey = localStorage.getItem('finnhubApiKey');
+        if (savedKey) document.getElementById('apiKey').value = savedKey;
+
+        let portfolio = JSON.parse(localStorage.getItem('stockPortfolio') || '[]');
+        let alerts    = JSON.parse(localStorage.getItem('stockAlerts')    || '[]');
+
+        renderPortfolio();
+        renderAlerts();
+
+        document.getElementById('symbol').addEventListener('keypress', e => {
+            if (e.key === 'Enter') loadStock();
+        });
+
+        // ─── Load Stock ─────────────────────────────────────────
+        async function loadStock() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const symbol = document.getElementById('symbol').value.toUpperCase().trim();
+
+            hideError();
+            if (!apiKey) return showError('אנא הכנס Finnhub API Key');
+            if (!symbol) return showError('אנא הכנס סימול מניה');
+
+            localStorage.setItem('finnhubApiKey', apiKey);
+
+            const btn = document.getElementById('loadBtn');
+            btn.disabled = true;
+            btn.innerHTML = 'טוען... <span class="spinner"></span>';
+
+            try {
+                // Quote
+                const quote = await fetchJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`);
+                if (!quote || quote.c === 0) return showError(`סימול "${symbol}" לא נמצא`);
+
+                const price = quote.c;
+
+                // Display quote
+                document.getElementById('stockInfo').style.display = 'grid';
+                document.getElementById('currentPrice').textContent = `$${price.toFixed(2)}`;
+                document.getElementById('alertPrice').value = price.toFixed(2);
+
+                setValueEl('change', (quote.d >= 0 ? '+' : '') + quote.d.toFixed(2), quote.d);
+                setValueEl('percentChange', (quote.dp >= 0 ? '+' : '') + quote.dp.toFixed(2) + '%', quote.dp);
+
+                // RSI
+                try {
+                    const ind = await fetchJson(`https://finnhub.io/api/v1/aggregate-indicator?symbol=${symbol}&resolution=D&count=14&token=${apiKey}`);
+                    const rsiVal = ind && ind.rsi != null ? ind.rsi.toFixed(1) : '—';
+                    const rsiEl = document.getElementById('rsi');
+                    rsiEl.textContent = rsiVal;
+                    if (ind && ind.rsi != null) {
+                        rsiEl.className = 'value' + (ind.rsi > 70 ? ' negative' : ind.rsi < 30 ? ' positive' : '');
+                    }
+                } catch { document.getElementById('rsi').textContent = '—'; }
+
+                // Candle chart
+                try {
+                    const candles = await fetchJson(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&count=200&token=${apiKey}`);
+                    if (candles && candles.s === 'ok') {
+                        document.getElementById('chart').style.display = 'block';
+                        createChart(candles, symbol);
+                    }
+                } catch {}
+
+                // Sentiment
+                try {
+                    const sent = await fetchJson(`https://finnhub.io/api/v1/stock/sentiment?symbol=${symbol}&days=10&token=${apiKey}`);
+                    const s = (sent && sent.sentiment != null) ? sent.sentiment : null;
+                    if (s !== null) {
+                        document.getElementById('sentimentScore').style.display = 'flex';
+                        const label = s > 0 ? `📈 ${s.toFixed(2)} חיובי` : s < 0 ? `📉 ${s.toFixed(2)} שלילי` : `${s.toFixed(2)} נייטרלי`;
+                        document.getElementById('sentimentValue').textContent = label;
+                        document.getElementById('sentimentValue').style.color = s > 0 ? 'var(--green)' : s < 0 ? 'var(--red)' : 'var(--text-dim)';
+                    }
+                } catch {}
+
+                // News
+                try {
+                    const news = await fetchJson(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${daysAgo(7)}&to=${today()}&token=${apiKey}`);
+                    if (news && news.length > 0) {
+                        document.getElementById('newsSection').style.display = 'block';
+                        displayNews(news);
+                    }
+                } catch {}
+
+                // Portfolio + alerts
+                updatePortfolioPrices(price, symbol);
+                checkAlerts(price, symbol);
+                renderAlerts();
+
+            } catch (err) {
+                showError('שגיאה: ' + (err.message || 'בעיית רשת'));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'טען נתונים';
+            }
+        }
+
+        function setValueEl(id, text, num) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = 'value' + (num > 0 ? ' positive' : num < 0 ? ' negative' : '');
+        }
+
+        async function fetchJson(url) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+
+        // ─── Chart ──────────────────────────────────────────────
+        function createChart(data, symbol) {
+            const dates = data.t.map(t => new Date(t * 1000).toISOString().split('T')[0]);
+            Plotly.newPlot('chart', [{
+                x: dates, close: data.c, open: data.o, high: data.h, low: data.l,
+                type: 'candlestick', name: symbol,
+                increasing: { line: { color: '#00e676' }, fillcolor: '#00e676' },
+                decreasing: { line: { color: '#ff1744' }, fillcolor: '#ff1744' }
+            }], {
+                title: { text: `${symbol} — 200 ימים`, font: { color: '#e2e8f0', size: 14 } },
+                paper_bgcolor: '#111827',
+                plot_bgcolor: '#111827',
+                xaxis: { title: 'תאריך', color: '#64748b', gridcolor: '#1f2d44', showgrid: true },
+                yaxis: { title: 'מחיר ($)', color: '#64748b', gridcolor: '#1f2d44', showgrid: true },
+                height: 520,
+                margin: { l: 60, r: 20, t: 50, b: 60 },
+                font: { family: 'IBM Plex Mono', color: '#e2e8f0' }
+            }, { responsive: true, displayModeBar: false });
+        }
+
+        // ─── News ───────────────────────────────────────────────
+        function displayNews(news) {
+            const list = document.getElementById('newsList');
+            list.innerHTML = news.slice(0, 10).map(item => {
+                const sc = item.sentiment
+                    ? (item.sentiment.includes('positive') ? 'positive'
+                     : item.sentiment.includes('negative') ? 'negative' : 'neutral')
+                    : 'neutral';
+                const scLabel = { positive: '▲ חיובי', negative: '▼ שלילי', neutral: '● נייטרלי' }[sc];
+                const date = new Date(item.published * 1000).toLocaleDateString('he-IL');
+                return `<div class="news-item">
+                    <h4>${escapeHtml(item.headline)}</h4>
+                    <div class="news-meta">
+                        <span class="badge ${sc}">${scLabel}</span>
+                        <span class="news-date">${date}</span>
+                        <a href="${item.url}" target="_blank" rel="noopener" class="news-link">קריאה ←</a>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // ─── Portfolio ──────────────────────────────────────────
+        function addToPortfolio() {
+            const symbol   = document.getElementById('portfolioSymbol').value.toUpperCase().trim();
+            const shares   = parseFloat(document.getElementById('portfolioShares').value);
+            const buyPrice = parseFloat(document.getElementById('portfolioBuyPrice').value);
+
+            if (!symbol || isNaN(shares) || shares <= 0 || isNaN(buyPrice) || buyPrice <= 0) {
+                return showError('אנא הכנס סימול, כמות מניות ומחיר קנייה תקינים');
+            }
+
+            const existing = portfolio.find(p => p.symbol === symbol);
+            if (existing) {
+                existing.totalInvested += shares * buyPrice;
+                existing.shares += shares;
+                existing.buyPrice = existing.totalInvested / existing.shares;
+                existing.currentValue = existing.currentPrice * existing.shares;
+                existing.profit = existing.currentValue - existing.totalInvested;
+                existing.profitPercent = (existing.profit / existing.totalInvested) * 100;
+            } else {
+                portfolio.push({
+                    id: Date.now(), symbol, shares, buyPrice,
+                    totalInvested: shares * buyPrice,
+                    currentPrice: buyPrice,
+                    currentValue: shares * buyPrice,
+                    profit: 0, profitPercent: 0
+                });
+            }
+
+            savePortfolio();
+            renderPortfolio();
+            document.getElementById('portfolioSymbol').value = '';
+            document.getElementById('portfolioShares').value = '';
+            document.getElementById('portfolioBuyPrice').value = '';
+        }
+
+        function removeFromPortfolio(id) {
+            portfolio = portfolio.filter(p => p.id !== id);
+            savePortfolio();
+            renderPortfolio();
+        }
+
+        function updatePortfolioPrices(currentPrice, symbol) {
+            const pos = portfolio.find(p => p.symbol === symbol);
+            if (!pos) return;
+            pos.currentPrice = currentPrice;
+            pos.currentValue = currentPrice * pos.shares;
+            pos.profit = pos.currentValue - pos.totalInvested;
+            pos.profitPercent = (pos.profit / pos.totalInvested) * 100;
+            savePortfolio();
+            renderPortfolio();
+        }
+
+        function renderPortfolio() {
+            const list = document.getElementById('portfolioList');
+            const summary = document.getElementById('portfolioSummary');
+
+            if (portfolio.length === 0) {
+                list.innerHTML = '<p class="empty-state">אין מניות ב-Portfolio</p>';
+                summary.style.display = 'none';
+                return;
+            }
+
+            let totalValue = 0, totalInvested = 0;
+            list.innerHTML = portfolio.map(pos => {
+                totalValue    += pos.currentValue;
+                totalInvested += pos.totalInvested;
+                const pColor = pos.profit >= 0 ? 'var(--green)' : 'var(--red)';
+                const pSign  = pos.profit >= 0 ? '+' : '';
+                return `<div class="portfolio-item">
+                    <div class="portfolio-info">
+                        <div class="portfolio-symbol">${pos.symbol}</div>
+                        <div class="portfolio-details">${pos.shares} × $${pos.buyPrice.toFixed(2)}</div>
+                        <div class="portfolio-details" style="color:${pColor}">${pSign}$${pos.profit.toFixed(2)} (${pSign}${pos.profitPercent.toFixed(2)}%)</div>
+                    </div>
+                    <div class="portfolio-value">$${pos.currentValue.toFixed(2)}</div>
+                    <button class="danger sm" onclick="removeFromPortfolio(${pos.id})">⨉</button>
+                </div>`;
+            }).join('');
+
+            summary.style.display = 'grid';
+            document.getElementById('totalValue').textContent = `$${totalValue.toFixed(2)}`;
+            document.getElementById('totalInvested').textContent = `$${totalInvested.toFixed(2)}`;
+
+            const ret = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+            const retEl = document.getElementById('totalReturn');
+            retEl.textContent = `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
+            retEl.style.color = ret >= 0 ? 'var(--green)' : 'var(--red)';
+        }
+
+        function savePortfolio() {
+            localStorage.setItem('stockPortfolio', JSON.stringify(portfolio));
+        }
+
+        // ─── Alerts ─────────────────────────────────────────────
+        function handleEnableNotifications() {
+            if (!('Notification' in window)) return;
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission().then(p => {
+                    if (p === 'granted') notify('התראות פעילות', '✅ אפשרת התראות');
+                });
+            }
+        }
+
+        function addAlert() {
+            const price  = parseFloat(document.getElementById('alertPrice').value);
+            const target = parseFloat(document.getElementById('alertTarget').value);
+            const type   = document.getElementById('alertType').value;
+            const symbol = document.getElementById('symbol').value.toUpperCase().trim() || '—';
+
+            if (isNaN(price) || isNaN(target) || target <= 0) {
+                return showError('אנא הכנס מחיר נוכחי ומחיר יעד תקינים');
+            }
+
+            alerts.push({
+                id: Date.now(), symbol,
+                currentPrice: price, targetPrice: target,
+                type, triggered: false
+            });
+            saveAlerts();
+            renderAlerts();
+            document.getElementById('alertTarget').value = '';
+        }
+
+        function removeAlert(id) {
+            alerts = alerts.filter(a => a.id !== id);
+            saveAlerts();
+            renderAlerts();
+        }
+
+        function checkAlerts(currentPrice, symbol) {
+            let changed = false;
+            alerts.forEach(alert => {
+                if (alert.triggered || alert.symbol !== symbol) return;
+                const hit = (alert.type === 'above' && currentPrice > alert.targetPrice) ||
+                            (alert.type === 'below' && currentPrice < alert.targetPrice);
+                if (hit) {
+                    alert.triggered = true;
+                    changed = true;
+                    notify('🔔 התראת מחיר!', `${alert.symbol}: ${currentPrice.toFixed(2)} ${alert.type === 'above' ? '>' : '<'} ${alert.targetPrice.toFixed(2)}`);
+                }
+            });
+            if (changed) saveAlerts();
+        }
+
+        function renderAlerts() {
+            const list = document.getElementById('alertsList');
+            if (alerts.length === 0) {
+                list.innerHTML = '<p class="empty-state">אין התראות</p>';
+                return;
+            }
+            list.innerHTML = alerts.map(a => `
+                <div class="alert-item ${!a.triggered ? 'active' : ''}">
+                    <div class="alert-info">
+                        <div class="alert-price">${a.symbol}</div>
+                        <div class="alert-target">${a.type === 'above' ? '>' : '<'} $${a.targetPrice.toFixed(2)} · נוכחי: $${a.currentPrice.toFixed(2)} ${a.triggered ? '· ✓ הופעלה' : ''}</div>
+                    </div>
+                    <button class="danger sm" onclick="removeAlert(${a.id})">⨉</button>
+                </div>`).join('');
+        }
+
+        function saveAlerts() {
+            localStorage.setItem('stockAlerts', JSON.stringify(alerts));
+        }
+
+        function notify(title, body) {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                new Notification(title, { body });
+            }
+        }
+
+        // ─── Helpers ────────────────────────────────────────────
+        function daysAgo(d) {
+            const date = new Date();
+            date.setDate(date.getDate() - d);
+            return date.toISOString().split('T')[0];
+        }
+        function today() { return new Date().toISOString().split('T')[0]; }
+
+        function showError(msg) {
+            const el = document.getElementById('error');
+            el.textContent = msg;
+            el.style.display = 'block';
+            clearTimeout(showError._t);
+            showError._t = setTimeout(() => el.style.display = 'none', 6000);
+        }
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
