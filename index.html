@@ -195,19 +195,6 @@
     <div id="errorMsg" class="error-msg"></div>
     <div id="infoMsg" class="info-msg"></div>
 
-    <!-- Add Fund -->
-    <div class="section">
-        <h2>➕ הוסף קרן</h2>
-        <div class="fund-preset-list" id="fundPresets"></div>
-        <div class="add-form">
-            <input type="text" id="fundNumber" placeholder="מספר קרן (7 ספרות)">
-            <input type="text" id="fundName" placeholder="שם הקרן">
-            <input type="number" id="fundUnits" placeholder="כמות יחידות (למשל: 81.26)" step="any" min="0">
-            <input type="number" id="fundBuyPrice" placeholder="מחיר קנייה ליחידה (₪)" step="any" min="0">
-            <button class="success full" id="addBtn" onclick="addFund()">+ הוסף קרן</button>
-        </div>
-    </div>
-
     <!-- Fund List -->
     <div class="section">
         <h2>📊 הקרנות שלי</h2>
@@ -225,6 +212,19 @@
                 <div class="s-label">תשואה כוללת</div>
                 <div class="s-value" id="totalReturn">0%</div>
             </div>
+        </div>
+    </div>
+
+    <!-- Add Fund -->
+    <div class="section">
+        <h2>➕ הוסף קרן</h2>
+        <div class="fund-preset-list" id="fundPresets"></div>
+        <div class="add-form">
+            <input type="text" id="fundNumber" placeholder="מספר קרן (7 ספרות)">
+            <input type="text" id="fundName" placeholder="שם הקרן">
+            <input type="number" id="fundUnits" placeholder="כמות יחידות (למשל: 81.26)" step="any" min="0">
+            <input type="number" id="fundBuyPrice" placeholder="מחיר קנייה ליחידה (₪)" step="any" min="0">
+            <button class="success full" id="addBtn" onclick="addFund()">+ הוסף קרן</button>
         </div>
     </div>
 
