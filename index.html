@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מנתח מניות</title>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <title>מעקב קרנות נאמנות</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         :root {
             --bg: #0a0e17;
@@ -17,1159 +17,566 @@
             --accent2: #7c3aed;
             --green: #00e676;
             --red: #ff1744;
+            --yellow: #f59e0b;
             --text: #e2e8f0;
             --text-dim: #64748b;
             --mono: 'IBM Plex Mono', monospace;
             --sans: 'Heebo', sans-serif;
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
             font-family: var(--sans);
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding: 24px 16px;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; padding: 24px 16px;
             background-image:
                 radial-gradient(ellipse at 10% 0%, rgba(0,212,255,0.06) 0%, transparent 50%),
                 radial-gradient(ellipse at 90% 100%, rgba(124,58,237,0.06) 0%, transparent 50%);
         }
+        .container { max-width: 900px; margin: 0 auto; }
 
-        .container { max-width: 1100px; margin: 0 auto; }
-
-        /* Header */
         .header {
             display: flex; align-items: center; gap: 14px;
-            margin-bottom: 32px; padding-bottom: 24px;
+            margin-bottom: 28px; padding-bottom: 20px;
             border-bottom: 1px solid var(--border);
         }
         .header-icon {
             width: 44px; height: 44px;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            background: linear-gradient(135deg, var(--yellow), #ef4444);
             border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
             font-size: 22px;
         }
-        .header h1 {
-            font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px;
+        .header h1 { font-size: 1.5rem; font-weight: 700; }
+        .header .subtitle { font-size: 0.8rem; color: var(--text-dim); font-family: var(--mono); }
+        .sync-status {
+            margin-right: auto; font-size: 11px;
+            font-family: var(--mono); color: var(--text-dim);
+            display: flex; align-items: center; gap: 6px;
         }
-        .header .subtitle {
-            font-size: 0.8rem; color: var(--text-dim);
-            font-family: var(--mono);
+        .sync-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--text-dim);
+        }
+        .sync-dot.ok { background: var(--green); }
+        .sync-dot.err { background: var(--red); }
+        .sync-dot.loading {
+            background: var(--yellow);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        .error-msg {
+            background: rgba(255,23,68,0.1); border: 1px solid rgba(255,23,68,0.3);
+            color: #ff6b8a; padding: 12px 16px; border-radius: 8px;
+            margin-bottom: 16px; font-size: 14px; display: none;
+        }
+        .info-msg {
+            background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.3);
+            color: var(--green); padding: 12px 16px; border-radius: 8px;
+            margin-bottom: 16px; font-size: 14px; display: none;
         }
 
-        /* Hint */
-        .hint {
-            background: rgba(0,212,255,0.07);
-            border: 1px solid rgba(0,212,255,0.2);
-            padding: 12px 16px; border-radius: 8px;
-            font-size: 13px; color: var(--text-dim);
-            margin-bottom: 20px;
+        .section {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px; margin-bottom: 20px;
         }
-        .hint a { color: var(--accent); text-decoration: none; font-weight: 600; }
+        .section h2 { font-size: 14px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 
-        /* Search */
-        .search-box {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 20px; border-radius: 12px;
-            margin-bottom: 24px;
-            display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 12px;
+        .fund-preset-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .fund-preset {
+            padding: 6px 14px; background: var(--surface2);
+            border: 1px solid var(--border); border-radius: 20px;
+            font-size: 12px; color: var(--text-dim);
+            cursor: pointer; transition: all 0.15s; font-family: var(--sans);
         }
-        @media (max-width: 600px) {
-            .search-box { grid-template-columns: 1fr; }
-        }
-        .api-key-row {
-            grid-column: 1 / -1;
+        .fund-preset:hover, .fund-preset.selected {
+            border-color: var(--yellow); color: var(--yellow);
+            background: rgba(245,158,11,0.08);
         }
 
-        input[type="text"], input[type="number"], input[type="password"], select {
-            width: 100%;
-            padding: 12px 14px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 14px;
-            font-family: var(--sans);
-            transition: border-color 0.2s;
+        .add-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        @media (max-width: 500px) { .add-form { grid-template-columns: 1fr; } }
+        .add-form .full { grid-column: 1 / -1; }
+
+        input[type="text"], input[type="number"] {
+            width: 100%; padding: 11px 14px;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text);
+            font-size: 14px; font-family: var(--sans); transition: border-color 0.2s;
         }
         input::placeholder { color: var(--text-dim); }
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(0,212,255,0.08);
-        }
-        select option { background: var(--surface2); }
+        input:focus { outline: none; border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(245,158,11,0.08); }
 
         button {
-            padding: 12px 24px;
-            background: var(--accent);
-            color: #000;
-            border: none; border-radius: 8px;
-            font-size: 14px; font-weight: 700;
-            cursor: pointer;
+            padding: 11px 20px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 700; cursor: pointer;
             transition: opacity 0.2s, transform 0.1s;
-            white-space: nowrap;
-            font-family: var(--sans);
+            font-family: var(--sans); white-space: nowrap;
         }
         button:hover { opacity: 0.85; transform: translateY(-1px); }
         button:active { transform: translateY(0); }
-        button:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-        button.danger { background: var(--red); color: #fff; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
         button.success { background: var(--green); color: #000; }
-        button.sm {
-            padding: 6px 12px; font-size: 12px; border-radius: 6px;
-        }
+        button.danger { background: var(--red); color: #fff; }
+        button.update-btn { background: var(--accent); color: #000; }
+        button.chart-btn { background: var(--accent2); color: #fff; }
+        button.sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
 
-        /* Error */
-        .error {
-            background: rgba(255,23,68,0.1);
-            border: 1px solid rgba(255,23,68,0.3);
-            color: #ff6b8a;
-            padding: 12px 16px; border-radius: 8px;
-            margin-bottom: 16px; font-size: 14px;
-            display: none;
-        }
-
-        /* Stock info cards */
-        .stock-info {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        @media (max-width: 700px) { .stock-info { grid-template-columns: repeat(2, 1fr); } }
-
-        .info-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 16px;
-            border-radius: 10px;
-        }
-        .info-card h3 {
-            font-size: 11px; font-weight: 400;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 8px;
-            font-family: var(--mono);
-        }
-        .info-card .value {
-            font-size: 22px; font-weight: 700;
-            font-family: var(--mono);
-            color: var(--text);
-        }
-        .info-card .value.positive { color: var(--green); }
-        .info-card .value.negative { color: var(--red); }
-        .info-card .value.small { font-size: 16px; }
-
-        /* Sentiment */
-        .sentiment-score {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 16px 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex; align-items: center; gap: 16px;
-        }
-        .sentiment-score .label {
-            font-size: 11px; color: var(--text-dim);
-            text-transform: uppercase; letter-spacing: 0.8px;
-            font-family: var(--mono);
-        }
-        .sentiment-score .overall {
-            font-size: 18px; font-weight: 700;
-            font-family: var(--mono);
-            color: var(--accent);
-        }
-
-        /* Chart */
-        #chart {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            margin-bottom: 20px;
-            overflow: hidden;
-            height: 520px;
-        }
-
-        /* Sections */
-        .section {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .section h2 {
-            font-size: 14px; font-weight: 700;
-            color: var(--text);
-            margin-bottom: 18px;
-            display: flex; align-items: center; gap: 8px;
-            letter-spacing: 0.3px;
-        }
-        .section h2 .icon { font-size: 16px; }
-
-        /* Portfolio form */
-        .portfolio-form, .alert-form {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 10px;
-            margin-bottom: 16px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        /* Portfolio items */
-        .portfolio-item {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-right: 3px solid var(--accent2);
-            padding: 14px 16px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .portfolio-item .portfolio-info { flex: 1; }
-        .portfolio-item .portfolio-symbol {
-            font-size: 15px; font-weight: 700;
-            font-family: var(--mono);
-        }
-        .portfolio-item .portfolio-details {
-            font-size: 12px; color: var(--text-dim);
-            margin-top: 3px; font-family: var(--mono);
-        }
-        .portfolio-item .portfolio-value {
-            font-size: 16px; font-weight: 700;
-            font-family: var(--mono);
-            color: var(--accent);
-        }
-
-        /* Portfolio summary */
-        .portfolio-summary {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            padding: 16px;
-            border-radius: 8px;
-            margin-top: 14px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-        }
-        .summary-item .label {
-            font-size: 10px; color: var(--text-dim);
-            text-transform: uppercase; letter-spacing: 0.8px;
-            font-family: var(--mono);
-            margin-bottom: 6px;
-        }
-        .summary-item .value {
-            font-size: 20px; font-weight: 700;
-            font-family: var(--mono);
-        }
-
-        /* Alerts */
-        .alert-toggle {
-            display: flex; align-items: center; gap: 10px;
-            margin-bottom: 16px;
-            font-size: 13px; color: var(--text-dim);
-        }
-        .alert-toggle input[type="checkbox"] {
-            width: 16px; height: 16px;
-            accent-color: var(--accent);
-            cursor: pointer;
-        }
-
-        .alert-item {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-right: 3px solid var(--text-dim);
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            display: flex; align-items: center; gap: 12px;
-        }
-        .alert-item.active { border-right-color: var(--green); }
-        .alert-item .alert-info { flex: 1; }
-        .alert-item .alert-price {
-            font-size: 14px; font-weight: 700;
-            font-family: var(--mono);
-        }
-        .alert-item .alert-target {
-            font-size: 12px; color: var(--text-dim);
-            font-family: var(--mono); margin-top: 2px;
-        }
-
-        /* News */
-        .news-item {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-right: 3px solid var(--accent);
-            padding: 14px 16px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        .news-item h4 {
-            font-size: 13px; font-weight: 600;
-            color: var(--text);
-            margin-bottom: 8px;
-            line-height: 1.5;
-        }
-        .news-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .badge {
-            display: inline-block; padding: 3px 8px;
-            border-radius: 4px; font-size: 11px;
-            font-weight: 700; font-family: var(--mono);
-        }
-        .badge.positive { background: rgba(0,230,118,0.15); color: var(--green); }
-        .badge.negative { background: rgba(255,23,68,0.15); color: var(--red); }
-        .badge.neutral { background: rgba(100,116,139,0.2); color: var(--text-dim); }
-        .news-date { font-size: 11px; color: var(--text-dim); font-family: var(--mono); }
-        .news-link { font-size: 12px; color: var(--accent); text-decoration: none; }
-        .news-link:hover { text-decoration: underline; }
-
-        .empty-state {
-            text-align: center; color: var(--text-dim);
-            font-size: 13px; padding: 20px 0;
-        }
-
-        /* Spinner */
-        /* Mutual funds */
-        .fund-preset-list {
-            display: flex; flex-wrap: wrap; gap: 8px;
-            margin-bottom: 14px;
-        }
-        .fund-preset {
-            padding: 6px 12px;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            font-size: 12px; color: var(--text-dim);
-            cursor: pointer; transition: all 0.15s;
-            font-family: var(--sans);
-        }
-        .fund-preset:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-            background: rgba(0,212,255,0.07);
-        }
         .fund-item {
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-right: 3px solid #f59e0b;
-            padding: 14px 16px;
-            border-radius: 8px;
-            margin-bottom: 8px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-right: 3px solid var(--yellow);
+            padding: 16px; border-radius: 8px; margin-bottom: 10px;
         }
-        .fund-item .fund-header {
-            display: flex; align-items: center;
-            justify-content: space-between; margin-bottom: 8px;
-        }
-        .fund-item .fund-name {
-            font-size: 14px; font-weight: 700;
-        }
-        .fund-item .fund-number {
-            font-size: 11px; color: var(--text-dim);
-            font-family: var(--mono);
-        }
-        .fund-item .fund-prices {
-            display: flex; gap: 16px; align-items: center;
-            flex-wrap: wrap;
-        }
-        .fund-item .fund-price-val {
-            font-size: 18px; font-weight: 700;
-            font-family: var(--mono); color: var(--accent);
-        }
-        .fund-item .fund-profit {
-            font-size: 13px; font-family: var(--mono);
-        }
-        .fund-item .fund-actions {
-            display: flex; gap: 8px; align-items: center;
-            margin-top: 10px;
-        }
-        .fund-item input[type="number"] {
-            width: 110px; padding: 6px 10px;
-            font-size: 13px;
-        }
+        .fund-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .fund-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+        .fund-meta { font-size: 11px; color: var(--text-dim); font-family: var(--mono); }
+        .fund-actions-top { display: flex; gap: 6px; }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner {
-            display: inline-block;
-            width: 14px; height: 14px;
-            border: 2px solid rgba(0,0,0,0.2);
-            border-top-color: #000;
-            border-radius: 50%;
-            animation: spin 0.7s linear infinite;
-            vertical-align: middle;
-            margin-left: 6px;
+        .fund-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+        .stat-label { font-size: 10px; color: var(--text-dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+        .stat-value { font-size: 16px; font-weight: 700; font-family: var(--mono); }
+        .stat-value.accent { color: var(--accent); }
+        .stat-value.green { color: var(--green); }
+        .stat-value.red { color: var(--red); }
+
+        .fund-update {
+            display: flex; gap: 8px; align-items: center;
+            padding-top: 10px; border-top: 1px solid var(--border); flex-wrap: wrap;
         }
+        .fund-update input { flex: 1; min-width: 120px; max-width: 160px; }
+        .update-hint { font-size: 11px; color: var(--text-dim); }
+
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; margin-top: 16px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 10px; padding: 16px;
+        }
+        .s-label { font-size: 10px; color: var(--text-dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+        .s-value { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+
+        .empty-state { text-align: center; color: var(--text-dim); font-size: 13px; padding: 24px 0; }
+        .last-update { font-size: 11px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; }
+
+        /* Chart modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); z-index: 100;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px;
+            width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-title { font-size: 15px; font-weight: 700; }
+        #chartDiv { height: 320px; }
+
+        .loading { text-align: center; color: var(--text-dim); padding: 20px; font-size: 13px; }
     </style>
 </head>
 <body>
-    <div class="container">
+<div class="container">
 
-        <div class="header">
-            <div class="header-icon">📈</div>
-            <div>
-                <h1>מנתח מניות</h1>
-                <div class="subtitle">נתוני שוק · תיק השקעות · התראות</div>
-            </div>
+    <div class="header">
+        <div class="header-icon">🏦</div>
+        <div>
+            <h1>מעקב קרנות נאמנות</h1>
+            <div class="subtitle">Firebase · עדכון ידני · היסטוריה</div>
         </div>
-
-        <div class="hint">
-            🔑 <strong>Finnhub</strong> (מניות אמריקאיות): <a href="https://finnhub.io/pricing" target="_blank">finnhub.io</a> · 60 בקשות/דקה
-            &nbsp;|&nbsp;
-            🔑 <strong>Twelve Data</strong> (מניות ישראליות .TA): <a href="https://twelvedata.com/pricing" target="_blank">twelvedata.com</a> · 8 בקשות/דקה
-            <br><br>
-            📌 מניות ישראליות — הוסף <strong>.TA</strong> לסימול: <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">TEVA.TA</code> · <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">POLI.TA</code> · <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">ESLT.TA</code>
+        <div class="sync-status">
+            <div class="sync-dot" id="syncDot"></div>
+            <span id="syncText">מתחבר...</span>
         </div>
-
-        <div class="search-box">
-            <div class="api-key-row">
-                <input type="password" id="apiKey" placeholder="🔑 Finnhub API Key (מניות אמריקאיות)">
-            </div>
-            <div class="api-key-row">
-                <input type="password" id="tdApiKey" placeholder="🔑 Twelve Data API Key (מניות ישראליות .TA)">
-            </div>
-            <input type="text" id="symbol" placeholder="סימול: AAPL · TEVA.TA · POLI.TA">
-            <div></div>
-            <button onclick="loadStock()" id="loadBtn">טען נתונים</button>
-        </div>
-
-        <div id="error" class="error"></div>
-
-        <!-- Stock Info -->
-        <div id="stockInfo" class="stock-info" style="display:none">
-            <div class="info-card">
-                <h3>מחיר נוכחי</h3>
-                <div class="value" id="currentPrice">—</div>
-            </div>
-            <div class="info-card">
-                <h3>שינוי ($)</h3>
-                <div class="value" id="change">—</div>
-            </div>
-            <div class="info-card">
-                <h3>שינוי (%)</h3>
-                <div class="value" id="percentChange">—</div>
-            </div>
-            <div class="info-card">
-                <h3>RSI (14)</h3>
-                <div class="value" id="rsi">—</div>
-            </div>
-        </div>
-
-        <!-- Sentiment -->
-        <div id="sentimentScore" class="sentiment-score" style="display:none">
-            <div>
-                <div class="label">סנטימנט כללי</div>
-                <div class="overall" id="sentimentValue">—</div>
-            </div>
-        </div>
-
-        <!-- Portfolio -->
-        <div class="section">
-            <h2><span class="icon">💼</span> תיק השקעות <button class="sm" id="refreshAllBtn" onclick="refreshAllPortfolio()" style="margin-right:12px;font-size:12px">🔄 עדכן הכל</button></h2>
-            <div class="portfolio-form">
-                <input type="text" id="portfolioSymbol" placeholder="סימול">
-                <input type="number" id="portfolioShares" placeholder="כמות מניות" min="0" step="any">
-                <input type="number" id="portfolioBuyPrice" placeholder="מחיר קנייה" min="0" step="any">
-                <button class="success" onclick="addToPortfolio()">+ הוסף</button>
-            </div>
-            <div id="portfolioList"><p class="empty-state">אין מניות ב-Portfolio</p></div>
-            <div class="portfolio-summary" id="portfolioSummary" style="display:none">
-                <div class="summary-item">
-                    <div class="label">ערך נוכחי</div>
-                    <div class="value" id="totalValue">$0</div>
-                </div>
-                <div class="summary-item">
-                    <div class="label">השקעה</div>
-                    <div class="value" id="totalInvested">$0</div>
-                </div>
-                <div class="summary-item">
-                    <div class="label">תשואה</div>
-                    <div class="value" id="totalReturn">0%</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Mutual Funds -->
-        <div class="section">
-            <h2><span class="icon">🏦</span> קרנות נאמנות (עדכון ידני)</h2>
-
-            <div class="fund-preset-list" id="fundPresets"></div>
-
-            <div class="portfolio-form" style="margin-bottom:0">
-                <input type="text" id="fundNumber" placeholder="מספר קרן (7 ספרות)">
-                <input type="text" id="fundName" placeholder="שם הקרן">
-                <input type="number" id="fundUnits" placeholder="כמות יחידות" min="0" step="any">
-                <input type="number" id="fundBuyPrice" placeholder="מחיר קנייה ליחידה" min="0" step="any">
-                <button class="success" onclick="addFund()">+ הוסף קרן</button>
-            </div>
-
-            <div id="fundList" style="margin-top:16px"><p class="empty-state">אין קרנות נאמנות</p></div>
-
-            <div class="portfolio-summary" id="fundSummary" style="display:none; margin-top:14px">
-                <div class="summary-item">
-                    <div class="label">ערך נוכחי</div>
-                    <div class="value" id="fundTotalValue">₪0</div>
-                </div>
-                <div class="summary-item">
-                    <div class="label">השקעה</div>
-                    <div class="value" id="fundTotalInvested">₪0</div>
-                </div>
-                <div class="summary-item">
-                    <div class="label">תשואה</div>
-                    <div class="value" id="fundTotalReturn">0%</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Alerts -->
-        <div class="section">
-            <h2><span class="icon">🔔</span> התראות מחיר</h2>
-            <div class="alert-toggle">
-                <input type="checkbox" id="enableNotifications" onchange="handleEnableNotifications()">
-                <label for="enableNotifications">אפשר התראות בדפדפן</label>
-            </div>
-            <div class="alert-form">
-                <input type="number" id="alertPrice" placeholder="מחיר נוכחי" step="any">
-                <input type="number" id="alertTarget" placeholder="מחיר יעד" step="any">
-                <select id="alertType">
-                    <option value="above">אם מחיר > יעד</option>
-                    <option value="below">אם מחיר &lt; יעד</option>
-                </select>
-                <button onclick="addAlert()">+ הוסף התראה</button>
-            </div>
-            <div id="alertsList"><p class="empty-state">אין התראות</p></div>
-        </div>
-
-        <!-- Chart -->
-        <div id="chart" style="display:none"></div>
-
-        <!-- News -->
-        <div class="section" id="newsSection" style="display:none">
-            <h2><span class="icon">📰</span> חדשות אחרונות</h2>
-            <div id="newsList"></div>
-        </div>
-
     </div>
 
-    <script>
-        // ─── Init ───────────────────────────────────────────────
-        const savedKey = localStorage.getItem('finnhubApiKey');
-        if (savedKey) document.getElementById('apiKey').value = savedKey;
-        const savedTdKey = localStorage.getItem('twelveDataApiKey');
-        if (savedTdKey) document.getElementById('tdApiKey').value = savedTdKey;
+    <div id="errorMsg" class="error-msg"></div>
+    <div id="infoMsg" class="info-msg"></div>
 
-        let portfolio = JSON.parse(localStorage.getItem('stockPortfolio') || '[]');
-        let alerts    = JSON.parse(localStorage.getItem('stockAlerts')    || '[]');
+    <!-- Add Fund -->
+    <div class="section">
+        <h2>➕ הוסף קרן</h2>
+        <div class="fund-preset-list" id="fundPresets"></div>
+        <div class="add-form">
+            <input type="text" id="fundNumber" placeholder="מספר קרן (7 ספרות)">
+            <input type="text" id="fundName" placeholder="שם הקרן">
+            <input type="number" id="fundUnits" placeholder="כמות יחידות (למשל: 81.26)" step="any" min="0">
+            <input type="number" id="fundBuyPrice" placeholder="מחיר קנייה ליחידה (₪)" step="any" min="0">
+            <button class="success full" id="addBtn" onclick="addFund()">+ הוסף קרן</button>
+        </div>
+    </div>
 
-        renderPortfolio();
-        renderAlerts();
+    <!-- Fund List -->
+    <div class="section">
+        <h2>📊 הקרנות שלי</h2>
+        <div id="fundList"><div class="loading">טוען נתונים מ-Firebase...</div></div>
+        <div class="summary-grid" id="fundSummary" style="display:none">
+            <div>
+                <div class="s-label">ערך נוכחי</div>
+                <div class="s-value" id="totalValue">₪0</div>
+            </div>
+            <div>
+                <div class="s-label">השקעה</div>
+                <div class="s-value" id="totalInvested">₪0</div>
+            </div>
+            <div>
+                <div class="s-label">תשואה כוללת</div>
+                <div class="s-value" id="totalReturn">0%</div>
+            </div>
+        </div>
+    </div>
 
-        document.getElementById('symbol').addEventListener('keypress', e => {
-            if (e.key === 'Enter') loadStock();
+</div>
+
+<!-- Chart Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="modalTitle">היסטוריית מחירים</div>
+            <button class="danger sm" onclick="closeChartModal()">✕ סגור</button>
+        </div>
+        <div id="chartDiv"></div>
+        <div id="historyTable" style="margin-top:14px"></div>
+    </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAnmz73-U2s7HBg2fuZsyoWLeMnweiUgek",
+    authDomain: "market-6171e.firebaseapp.com",
+    projectId: "market-6171e",
+    storageBucket: "market-6171e.firebasestorage.app",
+    messagingSenderId: "414425507433",
+    appId: "1:414425507433:web:802a3272b1db21762da4f8",
+    measurementId: "G-D4J30CZG4F"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+const FUNDS_COL   = 'funds';
+const HISTORY_COL = 'priceHistory'; // subcollection per fund
+
+// ── Presets ───────────────────────────────────────────
+const FUND_PRESETS = [
+    { number: '5125679', name: 'סיגמא גמישה' },
+    { number: '5120613', name: 'סיגמא מניות ישראל' },
+    { number: '5115514', name: 'סיגמא מדינה 20%+' },
+    { number: '5114632', name: 'אי.בי.אי. מדינה 10%+' },
+    { number: '5131644', name: 'אי.בי.אי. NASDAQ 100' },
+    { number: '5107420', name: 'אי.בי.אי. 20/80' },
+    { number: '5116033', name: 'אנליסט 20/80' },
+    { number: '5121090', name: 'מור מדדית מדינה 20%+' },
+    { number: '5134028', name: 'מיטב 25/75' },
+    { number: '5125794', name: 'אילים 20/80' },
+    { number: '5135074', name: 'תכלית PHLX Semiconductor' },
+];
+
+document.getElementById('fundPresets').innerHTML = FUND_PRESETS.map(f =>
+    `<button class="fund-preset" data-number="${f.number}" data-name="${escHtml(f.name)}" onclick="selectPreset(this)">${escHtml(f.name)}</button>`
+).join('');
+
+window.selectPreset = function(btn) {
+    document.getElementById('fundNumber').value = btn.dataset.number;
+    document.getElementById('fundName').value   = btn.dataset.name;
+    document.querySelectorAll('.fund-preset').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('fundUnits').focus();
+};
+
+// ── Sync indicator ────────────────────────────────────
+function setSyncStatus(state, text) {
+    const dot  = document.getElementById('syncDot');
+    const span = document.getElementById('syncText');
+    dot.className  = 'sync-dot ' + state;
+    span.textContent = text;
+}
+
+// ── Live listener ─────────────────────────────────────
+let funds = {};
+setSyncStatus('loading', 'מתחבר...');
+
+onSnapshot(collection(db, FUNDS_COL), snap => {
+    funds = {};
+    snap.forEach(d => funds[d.id] = { id: d.id, ...d.data() });
+    setSyncStatus('ok', 'מסונכרן');
+    renderFunds();
+}, err => {
+    setSyncStatus('err', 'שגיאת חיבור');
+    showError('שגיאת Firebase: ' + err.message);
+});
+
+// ── Add fund ──────────────────────────────────────────
+window.addFund = async function() {
+    const number   = document.getElementById('fundNumber').value.trim();
+    const name     = document.getElementById('fundName').value.trim();
+    const units    = parseFloat(document.getElementById('fundUnits').value);
+    const buyPrice = parseFloat(document.getElementById('fundBuyPrice').value);
+
+    if (!number || !name) return showError('אנא הכנס מספר קרן ושם');
+    if (isNaN(units) || units <= 0) return showError('אנא הכנס כמות יחידות תקינה');
+    if (isNaN(buyPrice) || buyPrice <= 0) return showError('אנא הכנס מחיר קנייה תקין');
+
+    const btn = document.getElementById('addBtn');
+    btn.disabled = true;
+
+    try {
+        const existing = Object.values(funds).find(f => f.number === number);
+        if (existing) {
+            const newInvested    = existing.totalInvested + units * buyPrice;
+            const newUnits       = existing.units + units;
+            const newBuyPrice    = newInvested / newUnits;
+            const newCurrentVal  = existing.currentPrice * newUnits;
+            await setDoc(doc(db, FUNDS_COL, existing.id), {
+                ...existing,
+                units: newUnits,
+                buyPrice: newBuyPrice,
+                totalInvested: newInvested,
+                currentValue: newCurrentVal,
+                profit: newCurrentVal - newInvested,
+                profitPercent: ((newCurrentVal - newInvested) / newInvested) * 100
+            });
+            showInfo(`✅ נוספו יחידות ל-${name}`);
+        } else {
+            const id = number;
+            await setDoc(doc(db, FUNDS_COL, id), {
+                number, name, units, buyPrice,
+                totalInvested: units * buyPrice,
+                currentPrice: buyPrice,
+                currentValue: units * buyPrice,
+                profit: 0, profitPercent: 0,
+                lastUpdated: null, createdAt: new Date().toISOString()
+            });
+            showInfo(`✅ ${name} נוספה`);
+        }
+        clearForm();
+    } catch(e) {
+        showError('שגיאה בשמירה: ' + e.message);
+    } finally {
+        btn.disabled = false;
+    }
+};
+
+// ── Update price ──────────────────────────────────────
+window.updatePrice = async function(id) {
+    const input    = document.getElementById('price_' + id);
+    const newPrice = parseFloat(input.value);
+    if (isNaN(newPrice) || newPrice <= 0) return showError('מחיר לא תקין');
+
+    const fund = funds[id];
+    if (!fund) return;
+
+    const newValue   = newPrice * fund.units;
+    const profit     = newValue - fund.totalInvested;
+    const profitPct  = (profit / fund.totalInvested) * 100;
+    const now        = new Date().toISOString();
+    const nowDisplay = new Date().toLocaleString('he-IL');
+
+    try {
+        // Update fund doc
+        await setDoc(doc(db, FUNDS_COL, id), {
+            ...fund,
+            currentPrice: newPrice,
+            currentValue: newValue,
+            profit, profitPercent: profitPct,
+            lastUpdated: nowDisplay
         });
 
-        // ─── Load Stock ─────────────────────────────────────────
-        function isIsraeliSymbol(symbol) {
-            return symbol.endsWith('.TA');
+        // Save to price history subcollection
+        await addDoc(collection(db, FUNDS_COL, id, HISTORY_COL), {
+            price: newPrice,
+            value: newValue,
+            profit, profitPercent: profitPct,
+            timestamp: now,
+            dateDisplay: nowDisplay
+        });
+
+        showInfo(`✅ ${fund.name} עודכן ל-₪${newPrice.toFixed(2)}`);
+    } catch(e) {
+        showError('שגיאה בעדכון: ' + e.message);
+    }
+};
+
+// ── Remove fund ───────────────────────────────────────
+window.removeFund = async function(id) {
+    if (!confirm('למחוק את הקרן?')) return;
+    try {
+        await deleteDoc(doc(db, FUNDS_COL, id));
+    } catch(e) {
+        showError('שגיאה במחיקה: ' + e.message);
+    }
+};
+
+// ── Show chart ────────────────────────────────────────
+window.showChart = async function(id) {
+    const fund = funds[id];
+    if (!fund) return;
+
+    document.getElementById('modalTitle').textContent = `📈 ${fund.name} — היסטוריית מחירים`;
+    document.getElementById('modalOverlay').classList.add('open');
+    document.getElementById('chartDiv').innerHTML = '<div class="loading">טוען היסטוריה...</div>';
+    document.getElementById('historyTable').innerHTML = '';
+
+    try {
+        const q    = query(collection(db, FUNDS_COL, id, HISTORY_COL), orderBy('timestamp'));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            document.getElementById('chartDiv').innerHTML = '<div class="loading">אין היסטוריה עדיין — עדכן מחיר כדי להתחיל</div>';
+            return;
         }
 
-        async function loadStock() {
-            const apiKey   = document.getElementById('apiKey').value.trim();
-            const tdApiKey = document.getElementById('tdApiKey').value.trim();
-            const symbol   = document.getElementById('symbol').value.toUpperCase().trim();
-
-            hideError();
-            if (!symbol) return showError('אנא הכנס סימול מניה');
-
-            const isIL = isIsraeliSymbol(symbol);
-
-            if (isIL && !tdApiKey) return showError('מניות ישראליות (.TA) דורשות Twelve Data API Key');
-            if (!isIL && !apiKey)  return showError('אנא הכנס Finnhub API Key');
-
-            localStorage.setItem('finnhubApiKey', apiKey);
-            if (tdApiKey) localStorage.setItem('twelveDataApiKey', tdApiKey);
-
-            const btn = document.getElementById('loadBtn');
-            btn.disabled = true;
-            btn.innerHTML = 'טוען... <span class="spinner"></span>';
-
-            try {
-                if (isIL) {
-                    await loadStockTwelveData(symbol, tdApiKey);
-                } else {
-                    await loadStockFinnhub(symbol, apiKey);
-                }
-            } catch (err) {
-                showError('שגיאה: ' + (err.message || 'בעיית רשת'));
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = 'טען נתונים';
-            }
-        }
-
-        // ─── Finnhub (מניות אמריקאיות) ──────────────────────────
-        async function loadStockFinnhub(symbol, apiKey) {
-                const quote = await fetchJson(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`);
-                if (!quote || quote.c === 0) return showError(`סימול "${symbol}" לא נמצא`);
-
-                const price = quote.c;
-                displayQuote(price, quote.d, quote.dp);
-
-                // RSI
-                try {
-                    const ind = await fetchJson(`https://finnhub.io/api/v1/aggregate-indicator?symbol=${symbol}&resolution=D&count=14&token=${apiKey}`);
-                    displayRSI(ind && ind.rsi != null ? ind.rsi : null);
-                } catch { displayRSI(null); }
-
-                // Chart
-                try {
-                    const candles = await fetchJson(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&count=200&token=${apiKey}`);
-                    if (candles && candles.s === 'ok') {
-                        document.getElementById('chart').style.display = 'block';
-                        createChart(candles.t.map(t => new Date(t*1000).toISOString().split('T')[0]), candles.o, candles.h, candles.l, candles.c, symbol);
-                    }
-                } catch {}
-
-                // Sentiment
-                try {
-                    const sent = await fetchJson(`https://finnhub.io/api/v1/stock/sentiment?symbol=${symbol}&days=10&token=${apiKey}`);
-                    displaySentiment(sent && sent.sentiment != null ? sent.sentiment : null);
-                } catch {}
-
-                // News
-                try {
-                    const news = await fetchJson(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${daysAgo(7)}&to=${today()}&token=${apiKey}`);
-                    if (news && news.length > 0) {
-                        document.getElementById('newsSection').style.display = 'block';
-                        displayNews(news);
-                    }
-                } catch {}
-
-                updatePortfolioPrices(price, symbol);
-                checkAlerts(price, symbol);
-                renderAlerts();
-        }
-
-        // ─── Twelve Data (מניות ישראליות .TA) ───────────────────
-        async function loadStockTwelveData(symbol, apiKey) {
-            const baseSym = symbol.replace('.TA', '');
-
-            // Quote
-            const quote = await fetchJson(`https://api.twelvedata.com/quote?symbol=${symbol}&apikey=${apiKey}`);
-            if (quote.status === 'error' || !quote.close) {
-                return showError(`סימול "${symbol}" לא נמצא ב-Twelve Data. נסה פורמט כמו TEVA:TASE`);
-            }
-
-            const price  = parseFloat(quote.close);
-            const prev   = parseFloat(quote.previous_close);
-            const change = price - prev;
-            const changePct = (change / prev) * 100;
-
-            displayQuote(price, change, changePct, '₪');
-            displayRSI(null); // Twelve Data RSI דורש endpoint נפרד
-
-            // Chart — time series
-            try {
-                const ts = await fetchJson(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=200&apikey=${apiKey}`);
-                if (ts.values && ts.values.length > 0) {
-                    const vals = [...ts.values].reverse();
-                    document.getElementById('chart').style.display = 'block';
-                    createChart(
-                        vals.map(v => v.datetime),
-                        vals.map(v => parseFloat(v.open)),
-                        vals.map(v => parseFloat(v.high)),
-                        vals.map(v => parseFloat(v.low)),
-                        vals.map(v => parseFloat(v.close)),
-                        symbol
-                    );
-                }
-            } catch {}
-
-            // אין news/sentiment ב-Twelve Data חינמי
-            document.getElementById('sentimentScore').style.display = 'none';
-            document.getElementById('newsSection').style.display = 'none';
-
-            updatePortfolioPrices(price, symbol);
-            checkAlerts(price, symbol);
-            renderAlerts();
-        }
-
-        // ─── Display helpers ─────────────────────────────────────
-        function displayQuote(price, change, changePct, currency = '$') {
-            document.getElementById('stockInfo').style.display = 'grid';
-            document.getElementById('currentPrice').textContent = `${currency}${price.toFixed(2)}`;
-            document.getElementById('alertPrice').value = price.toFixed(2);
-            setValueEl('change', (change >= 0 ? '+' : '') + change.toFixed(2), change);
-            setValueEl('percentChange', (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%', changePct);
-        }
-
-        function displayRSI(rsi) {
-            const el = document.getElementById('rsi');
-            if (rsi == null) { el.textContent = '—'; el.className = 'value'; return; }
-            el.textContent = rsi.toFixed(1);
-            el.className = 'value' + (rsi > 70 ? ' negative' : rsi < 30 ? ' positive' : '');
-        }
-
-        function displaySentiment(s) {
-            if (s === null) { document.getElementById('sentimentScore').style.display = 'none'; return; }
-            document.getElementById('sentimentScore').style.display = 'flex';
-            const label = s > 0 ? `📈 ${s.toFixed(2)} חיובי` : s < 0 ? `📉 ${s.toFixed(2)} שלילי` : `${s.toFixed(2)} נייטרלי`;
-            const el = document.getElementById('sentimentValue');
-            el.textContent = label;
-            el.style.color = s > 0 ? 'var(--green)' : s < 0 ? 'var(--red)' : 'var(--text-dim)';
-        }
-
-        function setValueEl(id, text, num) {
-            const el = document.getElementById(id);
-            el.textContent = text;
-            el.className = 'value' + (num > 0 ? ' positive' : num < 0 ? ' negative' : '');
-        }
-
-        async function fetchJson(url) {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-        }
-
-        // ─── Chart ──────────────────────────────────────────────
-        function createChart(dates, opens, highs, lows, closes, symbol) {
-            Plotly.newPlot('chart', [{
-                x: dates, open: opens, high: highs, low: lows, close: closes,
-                type: 'candlestick', name: symbol,
-                increasing: { line: { color: '#00e676' }, fillcolor: '#00e676' },
-                decreasing: { line: { color: '#ff1744' }, fillcolor: '#ff1744' }
-            }], {
-                title: { text: `${symbol} — 200 ימים`, font: { color: '#e2e8f0', size: 14 } },
-                paper_bgcolor: '#111827',
-                plot_bgcolor: '#111827',
-                xaxis: { title: 'תאריך', color: '#64748b', gridcolor: '#1f2d44', showgrid: true },
-                yaxis: { title: 'מחיר ($)', color: '#64748b', gridcolor: '#1f2d44', showgrid: true },
-                height: 520,
-                margin: { l: 60, r: 20, t: 50, b: 60 },
-                font: { family: 'IBM Plex Mono', color: '#e2e8f0' }
-            }, { responsive: true, displayModeBar: false });
-        }
-
-        // ─── News ───────────────────────────────────────────────
-        function displayNews(news) {
-            const list = document.getElementById('newsList');
-            list.innerHTML = news.slice(0, 10).map(item => {
-                const sc = item.sentiment
-                    ? (item.sentiment.includes('positive') ? 'positive'
-                     : item.sentiment.includes('negative') ? 'negative' : 'neutral')
-                    : 'neutral';
-                const scLabel = { positive: '▲ חיובי', negative: '▼ שלילי', neutral: '● נייטרלי' }[sc];
-                const date = new Date(item.published * 1000).toLocaleDateString('he-IL');
-                return `<div class="news-item">
-                    <h4>${escapeHtml(item.headline)}</h4>
-                    <div class="news-meta">
-                        <span class="badge ${sc}">${scLabel}</span>
-                        <span class="news-date">${date}</span>
-                        <a href="${item.url}" target="_blank" rel="noopener" class="news-link">קריאה ←</a>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function escapeHtml(str) {
-            return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-        }
-
-        // ─── Portfolio ──────────────────────────────────────────
-        function addToPortfolio() {
-            const symbol   = document.getElementById('portfolioSymbol').value.toUpperCase().trim();
-            const shares   = parseFloat(document.getElementById('portfolioShares').value);
-            const buyPrice = parseFloat(document.getElementById('portfolioBuyPrice').value);
-
-            if (!symbol || isNaN(shares) || shares <= 0 || isNaN(buyPrice) || buyPrice <= 0) {
-                return showError('אנא הכנס סימול, כמות מניות ומחיר קנייה תקינים');
-            }
-
-            const existing = portfolio.find(p => p.symbol === symbol);
-            if (existing) {
-                existing.totalInvested += shares * buyPrice;
-                existing.shares += shares;
-                existing.buyPrice = existing.totalInvested / existing.shares;
-                existing.currentValue = existing.currentPrice * existing.shares;
-                existing.profit = existing.currentValue - existing.totalInvested;
-                existing.profitPercent = (existing.profit / existing.totalInvested) * 100;
-            } else {
-                portfolio.push({
-                    id: Date.now(), symbol, shares, buyPrice,
-                    totalInvested: shares * buyPrice,
-                    currentPrice: buyPrice,
-                    currentValue: shares * buyPrice,
-                    profit: 0, profitPercent: 0
-                });
-            }
-
-            savePortfolio();
-            renderPortfolio();
-            document.getElementById('portfolioSymbol').value = '';
-            document.getElementById('portfolioShares').value = '';
-            document.getElementById('portfolioBuyPrice').value = '';
-        }
-
-        function removeFromPortfolio(id) {
-            portfolio = portfolio.filter(p => p.id !== id);
-            savePortfolio();
-            renderPortfolio();
-        }
-
-        function updatePortfolioPrices(currentPrice, symbol) {
-            const pos = portfolio.find(p => p.symbol === symbol);
-            if (!pos) return;
-            pos.currentPrice = currentPrice;
-            pos.currentValue = currentPrice * pos.shares;
-            pos.profit = pos.currentValue - pos.totalInvested;
-            pos.profitPercent = (pos.profit / pos.totalInvested) * 100;
-            savePortfolio();
-            renderPortfolio();
-        }
-
-        function renderPortfolio() {
-            const list = document.getElementById('portfolioList');
-            const summary = document.getElementById('portfolioSummary');
-
-            if (portfolio.length === 0) {
-                list.innerHTML = '<p class="empty-state">אין מניות ב-Portfolio</p>';
-                summary.style.display = 'none';
-                return;
-            }
-
-            let totalValue = 0, totalInvested = 0;
-            list.innerHTML = portfolio.map(pos => {
-                totalValue    += pos.currentValue;
-                totalInvested += pos.totalInvested;
-                const pColor = pos.profit >= 0 ? 'var(--green)' : 'var(--red)';
-                const pSign  = pos.profit >= 0 ? '+' : '';
-                return `<div class="portfolio-item">
-                    <div class="portfolio-info">
-                        <div class="portfolio-symbol">${pos.symbol}</div>
-                        <div class="portfolio-details">${pos.shares} × $${pos.buyPrice.toFixed(2)}</div>
-                        <div class="portfolio-details" style="color:${pColor}">${pSign}$${pos.profit.toFixed(2)} (${pSign}${pos.profitPercent.toFixed(2)}%)</div>
-                    </div>
-                    <div class="portfolio-value">$${pos.currentValue.toFixed(2)}</div>
-                    <button class="danger sm" onclick="removeFromPortfolio(${pos.id})">⨉</button>
-                </div>`;
-            }).join('');
-
-            summary.style.display = 'grid';
-            document.getElementById('totalValue').textContent = `$${totalValue.toFixed(2)}`;
-            document.getElementById('totalInvested').textContent = `$${totalInvested.toFixed(2)}`;
-
-            const ret = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
-            const retEl = document.getElementById('totalReturn');
-            retEl.textContent = `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
-            retEl.style.color = ret >= 0 ? 'var(--green)' : 'var(--red)';
-        }
-
-        async function refreshAllPortfolio() {
-            const apiKey   = document.getElementById('apiKey').value.trim();
-            const tdApiKey = document.getElementById('tdApiKey').value.trim();
-            if (portfolio.length === 0) return;
-
-            const btn = document.getElementById('refreshAllBtn');
-            btn.disabled = true;
-            btn.textContent = '⏳ מעדכן...';
-
-            let updated = 0, failed = 0;
-            for (const pos of portfolio) {
-                try {
-                    const isIL = isIsraeliSymbol(pos.symbol);
-                    let price = null;
-
-                    if (isIL && tdApiKey) {
-                        const q = await fetchJson(`https://api.twelvedata.com/quote?symbol=${pos.symbol}&apikey=${tdApiKey}`);
-                        if (q && q.close) price = parseFloat(q.close);
-                    } else if (!isIL && apiKey) {
-                        const q = await fetchJson(`https://finnhub.io/api/v1/quote?symbol=${pos.symbol}&token=${apiKey}`);
-                        if (q && q.c > 0) price = q.c;
-                    }
-
-                    if (price !== null) {
-                        pos.currentPrice = price;
-                        pos.currentValue = price * pos.shares;
-                        pos.profit = pos.currentValue - pos.totalInvested;
-                        pos.profitPercent = (pos.profit / pos.totalInvested) * 100;
-                        updated++;
-                    } else { failed++; }
-                } catch { failed++; }
-                await new Promise(r => setTimeout(r, 350));
-            }
-
-            savePortfolio();
-            renderPortfolio();
-            btn.disabled = false;
-            btn.textContent = '🔄 עדכן הכל';
-            showInfo(failed > 0 ? `עודכנו ${updated} · ${failed} נכשלו` : `✅ כל ${updated} המניות עודכנו`);
-        }
-
-        // ─── קרנות נאמנות ────────────────────────────────────────
-        const FUND_PRESETS = [
-            { number: '5125679', name: 'סיגמא גמישה' },
-            { number: '5120613', name: 'סיגמא מניות ישראל' },
-            { number: '5115514', name: 'סיגמא מדינה 20%+' },
-            { number: '5114632', name: 'אי.בי.אי. מדינה 10%+' },
-            { number: '5131644', name: 'אי.בי.אי. NASDAQ 100' },
-            { number: '5107420', name: 'אי.בי.אי. 20/80' },
-            { number: '5116033', name: 'אנליסט 20/80' },
-            { number: '5121090', name: 'מור מדדית מדינה 20%+' },
-            { number: '5134028', name: 'מיטב 25/75' },
-            { number: '5125794', name: 'אילים 20/80' },
-            { number: '5135074', name: 'תכלית PHLX Semiconductor' },
-        ];
-
-        let funds = JSON.parse(localStorage.getItem('mutualFunds') || '[]');
-
-        function initFundPresets() {
-            const el = document.getElementById('fundPresets');
-            el.innerHTML = FUND_PRESETS.map(f =>
-                `<button class="fund-preset" onclick="selectFundPreset('${f.number}','${f.name.replace(/'/g,"\\'")}')">
-                    ${f.name}
-                </button>`
-            ).join('');
-        }
-
-        function selectFundPreset(number, name) {
-            document.getElementById('fundNumber').value = number;
-            document.getElementById('fundName').value = name;
-            document.getElementById('fundUnits').focus();
-        }
-
-        function addFund() {
-            const number   = document.getElementById('fundNumber').value.trim();
-            const name     = document.getElementById('fundName').value.trim();
-            const units    = parseFloat(document.getElementById('fundUnits').value);
-            const buyPrice = parseFloat(document.getElementById('fundBuyPrice').value);
-
-            if (!number || !name || isNaN(units) || units <= 0 || isNaN(buyPrice) || buyPrice <= 0) {
-                return showError('אנא הכנס מספר קרן, שם, כמות יחידות ומחיר קנייה');
-            }
-
-            const existing = funds.find(f => f.number === number);
-            if (existing) {
-                existing.totalInvested += units * buyPrice;
-                existing.units += units;
-                existing.buyPrice = existing.totalInvested / existing.units;
-                existing.currentValue = existing.currentPrice * existing.units;
-                existing.profit = existing.currentValue - existing.totalInvested;
-                existing.profitPercent = (existing.profit / existing.totalInvested) * 100;
-            } else {
-                funds.push({
-                    id: Date.now(), number, name, units, buyPrice,
-                    totalInvested: units * buyPrice,
-                    currentPrice: buyPrice,
-                    currentValue: units * buyPrice,
-                    profit: 0, profitPercent: 0
-                });
-            }
-
-            saveFunds();
-            renderFunds();
-            document.getElementById('fundNumber').value = '';
-            document.getElementById('fundName').value = '';
-            document.getElementById('fundUnits').value = '';
-            document.getElementById('fundBuyPrice').value = '';
-        }
-
-        function removeFund(id) {
-            funds = funds.filter(f => f.id !== id);
-            saveFunds();
-            renderFunds();
-        }
-
-        function updateFundPrice(id) {
-            const input = document.getElementById(`fundPrice_${id}`);
-            const newPrice = parseFloat(input.value);
-            if (isNaN(newPrice) || newPrice <= 0) return showError('מחיר לא תקין');
-
-            const fund = funds.find(f => f.id === id);
-            if (!fund) return;
-            fund.currentPrice = newPrice;
-            fund.currentValue = newPrice * fund.units;
-            fund.profit = fund.currentValue - fund.totalInvested;
-            fund.profitPercent = (fund.profit / fund.totalInvested) * 100;
-            saveFunds();
-            renderFunds();
-            showInfo(`✅ ${fund.name} עודכן ל-₪${newPrice.toFixed(2)}`);
-        }
-
-        function renderFunds() {
-            const list    = document.getElementById('fundList');
-            const summary = document.getElementById('fundSummary');
-
-            if (funds.length === 0) {
-                list.innerHTML = '<p class="empty-state">אין קרנות נאמנות</p>';
-                summary.style.display = 'none';
-                return;
-            }
-
-            let totalValue = 0, totalInvested = 0;
-            list.innerHTML = funds.map(f => {
-                totalValue    += f.currentValue;
-                totalInvested += f.totalInvested;
-                const pColor = f.profit >= 0 ? 'var(--green)' : 'var(--red)';
-                const pSign  = f.profit >= 0 ? '+' : '';
-                return `<div class="fund-item">
-                    <div class="fund-header">
-                        <div>
-                            <div class="fund-name">${escapeHtml(f.name)}</div>
-                            <div class="fund-number">מס׳ ${f.number} · ${f.units} יחידות @ ₪${f.buyPrice.toFixed(2)}</div>
-                        </div>
-                        <button class="danger sm" onclick="removeFund(${f.id})">⨉</button>
-                    </div>
-                    <div class="fund-prices">
-                        <div>
-                            <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);margin-bottom:2px">ערך נוכחי</div>
-                            <div class="fund-price-val">₪${f.currentValue.toFixed(2)}</div>
-                        </div>
-                        <div class="fund-profit" style="color:${pColor}">${pSign}₪${f.profit.toFixed(2)} (${pSign}${f.profitPercent.toFixed(2)}%)</div>
-                    </div>
-                    <div class="fund-actions">
-                        <input type="number" id="fundPrice_${f.id}" placeholder="מחיר יחידה חדש" step="any" value="${f.currentPrice.toFixed(2)}">
-                        <button class="sm" onclick="updateFundPrice(${f.id})">עדכן מחיר</button>
-                    </div>
-                </div>`;
-            }).join('');
-
-            summary.style.display = 'grid';
-            document.getElementById('fundTotalValue').textContent    = `₪${totalValue.toFixed(2)}`;
-            document.getElementById('fundTotalInvested').textContent = `₪${totalInvested.toFixed(2)}`;
-            const ret = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
-            const retEl = document.getElementById('fundTotalReturn');
-            retEl.textContent = `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
-            retEl.style.color = ret >= 0 ? 'var(--green)' : 'var(--red)';
-        }
-
-        function saveFunds() {
-            localStorage.setItem('mutualFunds', JSON.stringify(funds));
-        }
-
-        initFundPresets();
-        renderFunds();
-
-        function savePortfolio() {
-            localStorage.setItem('stockPortfolio', JSON.stringify(portfolio));
-        }
-
-        // ─── Alerts ─────────────────────────────────────────────
-        function handleEnableNotifications() {
-            if (!('Notification' in window)) return;
-            if (Notification.permission !== 'granted') {
-                Notification.requestPermission().then(p => {
-                    if (p === 'granted') notify('התראות פעילות', '✅ אפשרת התראות');
-                });
-            }
-        }
-
-        function addAlert() {
-            const price  = parseFloat(document.getElementById('alertPrice').value);
-            const target = parseFloat(document.getElementById('alertTarget').value);
-            const type   = document.getElementById('alertType').value;
-            const symbol = document.getElementById('symbol').value.toUpperCase().trim() || '—';
-
-            if (isNaN(price) || isNaN(target) || target <= 0) {
-                return showError('אנא הכנס מחיר נוכחי ומחיר יעד תקינים');
-            }
-
-            alerts.push({
-                id: Date.now(), symbol,
-                currentPrice: price, targetPrice: target,
-                type, triggered: false
-            });
-            saveAlerts();
-            renderAlerts();
-            document.getElementById('alertTarget').value = '';
-        }
-
-        function removeAlert(id) {
-            alerts = alerts.filter(a => a.id !== id);
-            saveAlerts();
-            renderAlerts();
-        }
-
-        function checkAlerts(currentPrice, symbol) {
-            let changed = false;
-            alerts.forEach(alert => {
-                if (alert.triggered || alert.symbol !== symbol) return;
-                const hit = (alert.type === 'above' && currentPrice > alert.targetPrice) ||
-                            (alert.type === 'below' && currentPrice < alert.targetPrice);
-                if (hit) {
-                    alert.triggered = true;
-                    changed = true;
-                    notify('🔔 התראת מחיר!', `${alert.symbol}: ${currentPrice.toFixed(2)} ${alert.type === 'above' ? '>' : '<'} ${alert.targetPrice.toFixed(2)}`);
-                }
-            });
-            if (changed) saveAlerts();
-        }
-
-        function renderAlerts() {
-            const list = document.getElementById('alertsList');
-            if (alerts.length === 0) {
-                list.innerHTML = '<p class="empty-state">אין התראות</p>';
-                return;
-            }
-            list.innerHTML = alerts.map(a => `
-                <div class="alert-item ${!a.triggered ? 'active' : ''}">
-                    <div class="alert-info">
-                        <div class="alert-price">${a.symbol}</div>
-                        <div class="alert-target">${a.type === 'above' ? '>' : '<'} $${a.targetPrice.toFixed(2)} · נוכחי: $${a.currentPrice.toFixed(2)} ${a.triggered ? '· ✓ הופעלה' : ''}</div>
-                    </div>
-                    <button class="danger sm" onclick="removeAlert(${a.id})">⨉</button>
-                </div>`).join('');
-        }
-
-        function saveAlerts() {
-            localStorage.setItem('stockAlerts', JSON.stringify(alerts));
-        }
-
-        function notify(title, body) {
-            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                new Notification(title, { body });
-            }
-        }
-
-        // ─── Helpers ────────────────────────────────────────────
-        function daysAgo(d) {
-            const date = new Date();
-            date.setDate(date.getDate() - d);
-            return date.toISOString().split('T')[0];
-        }
-        function today() { return new Date().toISOString().split('T')[0]; }
-
-        function showInfo(msg) {
-            let el = document.getElementById('infoMsg');
-            if (!el) {
-                el = document.createElement('div');
-                el.id = 'infoMsg';
-                el.style.cssText = 'background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);color:#00e676;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;';
-                document.getElementById('error').insertAdjacentElement('afterend', el);
-            }
-            el.textContent = msg;
-            el.style.display = 'block';
-            clearTimeout(showInfo._t);
-            showInfo._t = setTimeout(() => el.style.display = 'none', 5000);
-        }
-
-        function showError(msg) {
-            const el = document.getElementById('error');
-            el.textContent = msg;
-            el.style.display = 'block';
-            clearTimeout(showError._t);
-            showError._t = setTimeout(() => el.style.display = 'none', 6000);
-        }
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
-    </script>
+        const dates  = [], prices = [], values = [], profits = [];
+        snap.forEach(d => {
+            const h = d.data();
+            dates.push(h.dateDisplay);
+            prices.push(h.price);
+            values.push(h.value);
+            profits.push(h.profitPercent);
+        });
+
+        Plotly.newPlot('chartDiv', [
+            { x: dates, y: prices, type: 'scatter', mode: 'lines+markers', name: 'מחיר יחידה (₪)', line: { color: '#00d4ff', width: 2 }, marker: { size: 6 } },
+            { x: dates, y: values, type: 'scatter', mode: 'lines+markers', name: 'ערך כולל (₪)', line: { color: '#00e676', width: 2 }, marker: { size: 6 }, yaxis: 'y2' }
+        ], {
+            paper_bgcolor: '#111827', plot_bgcolor: '#111827',
+            font: { family: 'IBM Plex Mono', color: '#e2e8f0', size: 11 },
+            xaxis: { color: '#64748b', gridcolor: '#1f2d44' },
+            yaxis: { title: 'מחיר יחידה', color: '#64748b', gridcolor: '#1f2d44' },
+            yaxis2: { title: 'ערך כולל', overlaying: 'y', side: 'left', color: '#64748b' },
+            legend: { bgcolor: 'transparent' },
+            margin: { l: 60, r: 20, t: 20, b: 60 },
+            height: 300
+        }, { responsive: true, displayModeBar: false });
+
+        // History table
+        const rows = [...snap.docs].reverse().slice(0, 10).map(d => {
+            const h = d.data();
+            const sign = h.profitPercent >= 0 ? '+' : '';
+            const color = h.profitPercent >= 0 ? 'var(--green)' : 'var(--red)';
+            return `<tr>
+                <td style="color:var(--text-dim);font-size:12px">${h.dateDisplay}</td>
+                <td style="font-family:var(--mono)">₪${h.price.toFixed(2)}</td>
+                <td style="font-family:var(--mono)">₪${fmt(h.value)}</td>
+                <td style="font-family:var(--mono);color:${color}">${sign}${h.profitPercent.toFixed(2)}%</td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('historyTable').innerHTML = `
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="color:var(--text-dim);font-size:11px;font-family:var(--mono)">
+                    <th style="text-align:right;padding:6px 4px">תאריך</th>
+                    <th style="text-align:right;padding:6px 4px">מחיר יחידה</th>
+                    <th style="text-align:right;padding:6px 4px">ערך כולל</th>
+                    <th style="text-align:right;padding:6px 4px">תשואה</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+
+    } catch(e) {
+        document.getElementById('chartDiv').innerHTML = '<div class="loading">שגיאה בטעינת היסטוריה</div>';
+    }
+};
+
+window.closeChartModal = function() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    Plotly.purge('chartDiv');
+};
+window.closeModal = function(e) {
+    if (e.target === document.getElementById('modalOverlay')) window.closeChartModal();
+};
+
+// ── Render ────────────────────────────────────────────
+function renderFunds() {
+    const list    = document.getElementById('fundList');
+    const summary = document.getElementById('fundSummary');
+    const arr     = Object.values(funds);
+
+    if (arr.length === 0) {
+        list.innerHTML = '<p class="empty-state">אין קרנות — הוסף קרן למעלה</p>';
+        summary.style.display = 'none';
+        return;
+    }
+
+    let totalValue = 0, totalInvested = 0;
+
+    list.innerHTML = arr.map(f => {
+        totalValue    += f.currentValue;
+        totalInvested += f.totalInvested;
+
+        const pClass = f.profit >= 0 ? 'green' : 'red';
+        const pSign  = f.profit >= 0 ? '+' : '';
+        const lastUpd = f.lastUpdated || 'טרם עודכן';
+
+        return `<div class="fund-item">
+            <div class="fund-header">
+                <div>
+                    <div class="fund-name">${escHtml(f.name)}</div>
+                    <div class="fund-meta">מס׳ ${f.number} · ${f.units} יחידות @ ₪${f.buyPrice.toFixed(2)}</div>
+                    <div class="last-update">${lastUpd}</div>
+                </div>
+                <div class="fund-actions-top">
+                    <button class="chart-btn sm" onclick="showChart('${f.id}')">📈 גרף</button>
+                    <button class="danger sm" onclick="removeFund('${f.id}')">⨉</button>
+                </div>
+            </div>
+            <div class="fund-stats">
+                <div>
+                    <div class="stat-label">ערך נוכחי</div>
+                    <div class="stat-value accent">₪${fmt(f.currentValue)}</div>
+                </div>
+                <div>
+                    <div class="stat-label">השקעה</div>
+                    <div class="stat-value">₪${fmt(f.totalInvested)}</div>
+                </div>
+                <div>
+                    <div class="stat-label">רווח/הפסד</div>
+                    <div class="stat-value ${pClass}">${pSign}₪${fmt(f.profit)}<br><span style="font-size:12px">${pSign}${f.profitPercent.toFixed(2)}%</span></div>
+                </div>
+            </div>
+            <div class="fund-update">
+                <input type="number" id="price_${f.id}" value="${f.currentPrice.toFixed(2)}" step="any" placeholder="מחיר יחידה חדש">
+                <button class="update-btn sm" onclick="updatePrice('${f.id}')">עדכן מחיר</button>
+                <span class="update-hint">מחיר ממיטב →</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    summary.style.display = 'grid';
+    document.getElementById('totalValue').textContent    = `₪${fmt(totalValue)}`;
+    document.getElementById('totalInvested').textContent = `₪${fmt(totalInvested)}`;
+
+    const ret   = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+    const retEl = document.getElementById('totalReturn');
+    retEl.textContent = `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
+    retEl.style.color = ret >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
+// ── Helpers ───────────────────────────────────────────
+function clearForm() {
+    ['fundNumber','fundName','fundUnits','fundBuyPrice'].forEach(id => document.getElementById(id).value = '');
+    document.querySelectorAll('.fund-preset').forEach(b => b.classList.remove('selected'));
+}
+function fmt(n) { return Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg; el.style.display = 'block';
+    clearTimeout(showError._t);
+    showError._t = setTimeout(() => el.style.display = 'none', 6000);
+}
+function showInfo(msg) {
+    const el = document.getElementById('infoMsg');
+    el.textContent = msg; el.style.display = 'block';
+    clearTimeout(showInfo._t);
+    showInfo._t = setTimeout(() => el.style.display = 'none', 4000);
+}
+</script>
 </body>
 </html>
