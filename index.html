@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analyzer - Finnhub API + Portfolio</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            color: white; text-align: center; margin-bottom: 30px;
+            font-size: 2.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .search-box {
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px; display: flex; gap: 10px; flex-wrap: wrap;
+        }
+        input[type="text"], input[type="number"] {
+            flex: 1; min-width: 200px; padding: 15px;
+            border: 2px solid #ddd; border-radius: 10px;
+            font-size: 16px; transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus { outline: none; border-color: #667eea; }
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 10px;
+            font-size: 16px; cursor: pointer; transition: transform 0.2s; font-weight: bold;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.danger { background: #e74c3c; }
+        button.success { background: #27ae60; }
+        .api-key-input { width: 100%; margin-bottom: 15px; }
+        .stock-info {
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;
+        }
+        .info-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px; border-radius: 10px; text-align: center;
+        }
+        .info-card h3 { color: #667eea; margin-bottom: 10px; font-size: 14px; }
+        .info-card .value { font-size: 24px; font-weight: bold; color: #333; }
+        .info-card .value.positive { color: #27ae60; }
+        .info-card .value.negative { color: #e74c3c; }
+        .info-card .value.small { font-size: 18px; }
+        #chart {
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px; height: 600px;
+        }
+        .news-section {
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .news-section h2, .portfolio-section h2, .alert-section h2 { color: #667eea; margin-bottom: 20px; }
+        .news-item {
+            background: #f8f9fa; padding: 15px; border-radius: 10px;
+            margin-bottom: 10px; border-right: 4px solid #667eea;
+        }
+        .news-item h4 { color: #333; margin-bottom: 10px; }
+        .news-item .sentiment {
+            display: inline-block; padding: 5px 10px; border-radius: 5px;
+            font-size: 12px; font-weight: bold; margin-right: 10px;
+        }
+        .sentiment.positive { background: #d4edda; color: #155724; }
+        .sentiment.negative { background: #f8d7da; color: #721c24; }
+        .sentiment.neutral { background: #e2e3e5; color: #383d41; }
+        .sentiment-score {
+            text-align: center; padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px; color: white; margin-bottom: 20px;
+        }
+        .sentiment-score .overall { font-size: 2em; font-weight: bold; margin-bottom: 10px; }
+        .error {
+            background: #f8d7da; color: #721c24; padding: 15px;
+            border-radius: 10px; margin-bottom: 20px;
+        }
+        .hint {
+            background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;
+            color: white; margin-bottom: 20px; font-size: 14px;
+        }
+        .hint a { color: #ffd700; font-weight: bold; }
+        
+        /* Portfolio section */
+        .portfolio-section {
+            background: white; padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px;
+        }
+        .portfolio-form {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px; margin-bottom: 15px;
+        }
+        .portfolio-form input, .portfolio-form select {
+            padding: 12px; border: 2px solid #ddd; border-radius: 8px;
+            font-size: 14px;
+        }
+        .portfolio-item {
+            background: #f8f9fa; padding: 15px; border-radius: 10px;
+            margin-bottom: 10px; display: flex; justify-content: space-between;
+            align-items: center; border-right: 4px solid #667eea;
+        }
+        .portfolio-item .portfolio-info { flex: 1; }
+        .portfolio-item .portfolio-sy
