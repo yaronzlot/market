@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Analyzer</title>
+    <title>מנתח מניות</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -358,8 +358,8 @@
         <div class="header">
             <div class="header-icon">📈</div>
             <div>
-                <h1>Stock Analyzer</h1>
-                <div class="subtitle">Finnhub API · Portfolio · Alerts</div>
+                <h1>מנתח מניות</h1>
+                <div class="subtitle">נתוני שוק · תיק השקעות · התראות</div>
             </div>
         </div>
 
@@ -409,7 +409,7 @@
 
         <!-- Portfolio -->
         <div class="section">
-            <h2><span class="icon">💼</span> Portfolio</h2>
+            <h2><span class="icon">💼</span> תיק השקעות <button class="sm" id="refreshAllBtn" onclick="refreshAllPortfolio()" style="margin-right:12px;font-size:12px">🔄 עדכן הכל</button></h2>
             <div class="portfolio-form">
                 <input type="text" id="portfolioSymbol" placeholder="סימול">
                 <input type="number" id="portfolioShares" placeholder="כמות מניות" min="0" step="any">
@@ -708,6 +708,42 @@
             retEl.style.color = ret >= 0 ? 'var(--green)' : 'var(--red)';
         }
 
+        async function refreshAllPortfolio() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) return showError('אנא הכנס Finnhub API Key כדי לעדכן את התיק');
+            if (portfolio.length === 0) return;
+
+            const btn = document.getElementById('refreshAllBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ מעדכן...';
+
+            let updated = 0, failed = 0;
+            for (const pos of portfolio) {
+                try {
+                    const quote = await fetchJson(`https://finnhub.io/api/v1/quote?symbol=${pos.symbol}&token=${apiKey}`);
+                    if (quote && quote.c > 0) {
+                        pos.currentPrice = quote.c;
+                        pos.currentValue = quote.c * pos.shares;
+                        pos.profit = pos.currentValue - pos.totalInvested;
+                        pos.profitPercent = (pos.profit / pos.totalInvested) * 100;
+                        updated++;
+                    } else { failed++; }
+                } catch { failed++; }
+                // קצב: מנע חריגת לימיט
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            savePortfolio();
+            renderPortfolio();
+            btn.disabled = false;
+            btn.textContent = '🔄 עדכן הכל';
+
+            const msg = failed > 0
+                ? `עודכנו ${updated} מניות · ${failed} נכשלו`
+                : `✅ כל ${updated} המניות עודכנו`;
+            showInfo(msg);
+        }
+
         function savePortfolio() {
             localStorage.setItem('stockPortfolio', JSON.stringify(portfolio));
         }
@@ -796,6 +832,20 @@
             return date.toISOString().split('T')[0];
         }
         function today() { return new Date().toISOString().split('T')[0]; }
+
+        function showInfo(msg) {
+            let el = document.getElementById('infoMsg');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'infoMsg';
+                el.style.cssText = 'background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);color:#00e676;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px;';
+                document.getElementById('error').insertAdjacentElement('afterend', el);
+            }
+            el.textContent = msg;
+            el.style.display = 'block';
+            clearTimeout(showInfo._t);
+            showInfo._t = setTimeout(() => el.style.display = 'none', 5000);
+        }
 
         function showError(msg) {
             const el = document.getElementById('error');
