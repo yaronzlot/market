@@ -339,6 +339,64 @@
         }
 
         /* Spinner */
+        /* Mutual funds */
+        .fund-preset-list {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            margin-bottom: 14px;
+        }
+        .fund-preset {
+            padding: 6px 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px; color: var(--text-dim);
+            cursor: pointer; transition: all 0.15s;
+            font-family: var(--sans);
+        }
+        .fund-preset:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0,212,255,0.07);
+        }
+        .fund-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-right: 3px solid #f59e0b;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .fund-item .fund-header {
+            display: flex; align-items: center;
+            justify-content: space-between; margin-bottom: 8px;
+        }
+        .fund-item .fund-name {
+            font-size: 14px; font-weight: 700;
+        }
+        .fund-item .fund-number {
+            font-size: 11px; color: var(--text-dim);
+            font-family: var(--mono);
+        }
+        .fund-item .fund-prices {
+            display: flex; gap: 16px; align-items: center;
+            flex-wrap: wrap;
+        }
+        .fund-item .fund-price-val {
+            font-size: 18px; font-weight: 700;
+            font-family: var(--mono); color: var(--accent);
+        }
+        .fund-item .fund-profit {
+            font-size: 13px; font-family: var(--mono);
+        }
+        .fund-item .fund-actions {
+            display: flex; gap: 8px; align-items: center;
+            margin-top: 10px;
+        }
+        .fund-item input[type="number"] {
+            width: 110px; padding: 6px 10px;
+            font-size: 13px;
+        }
+
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner {
             display: inline-block;
@@ -435,6 +493,38 @@
                 <div class="summary-item">
                     <div class="label">תשואה</div>
                     <div class="value" id="totalReturn">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mutual Funds -->
+        <div class="section">
+            <h2><span class="icon">🏦</span> קרנות נאמנות (עדכון ידני)</h2>
+
+            <div class="fund-preset-list" id="fundPresets"></div>
+
+            <div class="portfolio-form" style="margin-bottom:0">
+                <input type="text" id="fundNumber" placeholder="מספר קרן (7 ספרות)">
+                <input type="text" id="fundName" placeholder="שם הקרן">
+                <input type="number" id="fundUnits" placeholder="כמות יחידות" min="0" step="any">
+                <input type="number" id="fundBuyPrice" placeholder="מחיר קנייה ליחידה" min="0" step="any">
+                <button class="success" onclick="addFund()">+ הוסף קרן</button>
+            </div>
+
+            <div id="fundList" style="margin-top:16px"><p class="empty-state">אין קרנות נאמנות</p></div>
+
+            <div class="portfolio-summary" id="fundSummary" style="display:none; margin-top:14px">
+                <div class="summary-item">
+                    <div class="label">ערך נוכחי</div>
+                    <div class="value" id="fundTotalValue">₪0</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">השקעה</div>
+                    <div class="value" id="fundTotalInvested">₪0</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">תשואה</div>
+                    <div class="value" id="fundTotalReturn">0%</div>
                 </div>
             </div>
         </div>
@@ -822,6 +912,150 @@
             btn.textContent = '🔄 עדכן הכל';
             showInfo(failed > 0 ? `עודכנו ${updated} · ${failed} נכשלו` : `✅ כל ${updated} המניות עודכנו`);
         }
+
+        // ─── קרנות נאמנות ────────────────────────────────────────
+        const FUND_PRESETS = [
+            { number: '5125679', name: 'סיגמא גמישה' },
+            { number: '5120613', name: 'סיגמא מניות ישראל' },
+            { number: '5115514', name: 'סיגמא מדינה 20%+' },
+            { number: '5114632', name: 'אי.בי.אי. מדינה 10%+' },
+            { number: '5131644', name: 'אי.בי.אי. NASDAQ 100' },
+            { number: '5107420', name: 'אי.בי.אי. 20/80' },
+            { number: '5116033', name: 'אנליסט 20/80' },
+            { number: '5121090', name: 'מור מדדית מדינה 20%+' },
+            { number: '5134028', name: 'מיטב 25/75' },
+            { number: '5125794', name: 'אילים 20/80' },
+            { number: '5135074', name: 'תכלית PHLX Semiconductor' },
+        ];
+
+        let funds = JSON.parse(localStorage.getItem('mutualFunds') || '[]');
+
+        function initFundPresets() {
+            const el = document.getElementById('fundPresets');
+            el.innerHTML = FUND_PRESETS.map(f =>
+                `<button class="fund-preset" onclick="selectFundPreset('${f.number}','${f.name.replace(/'/g,"\\'")}')">
+                    ${f.name}
+                </button>`
+            ).join('');
+        }
+
+        function selectFundPreset(number, name) {
+            document.getElementById('fundNumber').value = number;
+            document.getElementById('fundName').value = name;
+            document.getElementById('fundUnits').focus();
+        }
+
+        function addFund() {
+            const number   = document.getElementById('fundNumber').value.trim();
+            const name     = document.getElementById('fundName').value.trim();
+            const units    = parseFloat(document.getElementById('fundUnits').value);
+            const buyPrice = parseFloat(document.getElementById('fundBuyPrice').value);
+
+            if (!number || !name || isNaN(units) || units <= 0 || isNaN(buyPrice) || buyPrice <= 0) {
+                return showError('אנא הכנס מספר קרן, שם, כמות יחידות ומחיר קנייה');
+            }
+
+            const existing = funds.find(f => f.number === number);
+            if (existing) {
+                existing.totalInvested += units * buyPrice;
+                existing.units += units;
+                existing.buyPrice = existing.totalInvested / existing.units;
+                existing.currentValue = existing.currentPrice * existing.units;
+                existing.profit = existing.currentValue - existing.totalInvested;
+                existing.profitPercent = (existing.profit / existing.totalInvested) * 100;
+            } else {
+                funds.push({
+                    id: Date.now(), number, name, units, buyPrice,
+                    totalInvested: units * buyPrice,
+                    currentPrice: buyPrice,
+                    currentValue: units * buyPrice,
+                    profit: 0, profitPercent: 0
+                });
+            }
+
+            saveFunds();
+            renderFunds();
+            document.getElementById('fundNumber').value = '';
+            document.getElementById('fundName').value = '';
+            document.getElementById('fundUnits').value = '';
+            document.getElementById('fundBuyPrice').value = '';
+        }
+
+        function removeFund(id) {
+            funds = funds.filter(f => f.id !== id);
+            saveFunds();
+            renderFunds();
+        }
+
+        function updateFundPrice(id) {
+            const input = document.getElementById(`fundPrice_${id}`);
+            const newPrice = parseFloat(input.value);
+            if (isNaN(newPrice) || newPrice <= 0) return showError('מחיר לא תקין');
+
+            const fund = funds.find(f => f.id === id);
+            if (!fund) return;
+            fund.currentPrice = newPrice;
+            fund.currentValue = newPrice * fund.units;
+            fund.profit = fund.currentValue - fund.totalInvested;
+            fund.profitPercent = (fund.profit / fund.totalInvested) * 100;
+            saveFunds();
+            renderFunds();
+            showInfo(`✅ ${fund.name} עודכן ל-₪${newPrice.toFixed(2)}`);
+        }
+
+        function renderFunds() {
+            const list    = document.getElementById('fundList');
+            const summary = document.getElementById('fundSummary');
+
+            if (funds.length === 0) {
+                list.innerHTML = '<p class="empty-state">אין קרנות נאמנות</p>';
+                summary.style.display = 'none';
+                return;
+            }
+
+            let totalValue = 0, totalInvested = 0;
+            list.innerHTML = funds.map(f => {
+                totalValue    += f.currentValue;
+                totalInvested += f.totalInvested;
+                const pColor = f.profit >= 0 ? 'var(--green)' : 'var(--red)';
+                const pSign  = f.profit >= 0 ? '+' : '';
+                return `<div class="fund-item">
+                    <div class="fund-header">
+                        <div>
+                            <div class="fund-name">${escapeHtml(f.name)}</div>
+                            <div class="fund-number">מס׳ ${f.number} · ${f.units} יחידות @ ₪${f.buyPrice.toFixed(2)}</div>
+                        </div>
+                        <button class="danger sm" onclick="removeFund(${f.id})">⨉</button>
+                    </div>
+                    <div class="fund-prices">
+                        <div>
+                            <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);margin-bottom:2px">ערך נוכחי</div>
+                            <div class="fund-price-val">₪${f.currentValue.toFixed(2)}</div>
+                        </div>
+                        <div class="fund-profit" style="color:${pColor}">${pSign}₪${f.profit.toFixed(2)} (${pSign}${f.profitPercent.toFixed(2)}%)</div>
+                    </div>
+                    <div class="fund-actions">
+                        <input type="number" id="fundPrice_${f.id}" placeholder="מחיר יחידה חדש" step="any" value="${f.currentPrice.toFixed(2)}">
+                        <button class="sm" onclick="updateFundPrice(${f.id})">עדכן מחיר</button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            summary.style.display = 'grid';
+            document.getElementById('fundTotalValue').textContent    = `₪${totalValue.toFixed(2)}`;
+            document.getElementById('fundTotalInvested').textContent = `₪${totalInvested.toFixed(2)}`;
+            const ret = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+            const retEl = document.getElementById('fundTotalReturn');
+            retEl.textContent = `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
+            retEl.style.color = ret >= 0 ? 'var(--green)' : 'var(--red)';
+        }
+
+        function saveFunds() {
+            localStorage.setItem('mutualFunds', JSON.stringify(funds));
+        }
+
+        initFundPresets();
+        renderFunds();
 
         function savePortfolio() {
             localStorage.setItem('stockPortfolio', JSON.stringify(portfolio));
