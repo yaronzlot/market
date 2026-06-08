@@ -178,6 +178,19 @@
     </style>
 </head>
 <body>
+<!-- Login Screen -->
+<div id="loginScreen" style="display:none; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:20px; text-align:center;">
+    <div style="font-size:48px">🏦</div>
+    <h2 style="font-size:1.4rem; font-weight:700">מעקב קרנות נאמנות</h2>
+    <p style="color:var(--text-dim); font-size:14px">אנא התחבר כדי לגשת לנתונים</p>
+    <button onclick="googleLogin()" style="background:white; color:#333; display:flex; align-items:center; gap:10px; padding:14px 24px; border-radius:10px; font-size:15px; font-weight:600; border:none; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,0.3)">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="22">
+        התחבר עם Google
+    </button>
+</div>
+
+<!-- App Screen -->
+<div id="appScreen" style="display:none">
 <div class="container">
 
     <div class="header">
@@ -190,6 +203,9 @@
             <div class="sync-dot" id="syncDot"></div>
             <span id="syncText">מתחבר...</span>
         </div>
+        <button onclick="logout()" style="background:transparent; color:var(--text-dim); border:1px solid var(--border); padding:6px 12px; font-size:12px; border-radius:6px; margin-right:auto">
+            <span id="userEmail"></span> · יציאה
+        </button>
     </div>
 
     <div id="errorMsg" class="error-msg"></div>
@@ -226,7 +242,8 @@
         </div>
     </div>
 
-</div>
+</div><!-- /container -->
+</div><!-- /appScreen -->
 
 <!-- Chart Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
@@ -243,6 +260,9 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const ALLOWED_EMAIL = 'yaron.zlotolov@gmail.com';
 
 const firebaseConfig = {
     apiKey: "AIzaSyAnmz73-U2s7HBg2fuZsyoWLeMnweiUgek",
@@ -254,11 +274,61 @@ const firebaseConfig = {
     measurementId: "G-D4J30CZG4F"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const app      = initializeApp(firebaseConfig);
+const db       = getFirestore(app);
+const auth     = getAuth(app);
+const provider = new GoogleAuthProvider();
 
 const FUNDS_COL   = 'funds';
-const HISTORY_COL = 'priceHistory'; // subcollection per fund
+const HISTORY_COL = 'priceHistory';
+
+// ── Auth UI ───────────────────────────────────────────
+const loginScreen = document.getElementById('loginScreen');
+const appScreen   = document.getElementById('appScreen');
+
+window.googleLogin = async function() {
+    try {
+        const result = await signInWithPopup(auth, provider);
+        if (result.user.email !== ALLOWED_EMAIL) {
+            await signOut(auth);
+            showError('גישה מותרת רק לחשבון המורשה');
+        }
+    } catch(e) {
+        showError('שגיאת התחברות: ' + e.message);
+    }
+};
+
+window.logout = async function() {
+    await signOut(auth);
+};
+
+onAuthStateChanged(auth, user => {
+    if (user && user.email === ALLOWED_EMAIL) {
+        loginScreen.style.display = 'none';
+        appScreen.style.display   = 'block';
+        document.getElementById('userEmail').textContent = user.email;
+        startListening();
+    } else {
+        loginScreen.style.display = 'flex';
+        appScreen.style.display   = 'none';
+        funds = {};
+    }
+});
+
+let unsubscribe = null;
+function startListening() {
+    if (unsubscribe) unsubscribe();
+    setSyncStatus('loading', 'מתחבר...');
+    unsubscribe = onSnapshot(collection(db, FUNDS_COL), snap => {
+        funds = {};
+        snap.forEach(d => funds[d.id] = { id: d.id, ...d.data() });
+        setSyncStatus('ok', 'מסונכרן');
+        renderFunds();
+    }, err => {
+        setSyncStatus('err', 'שגיאת חיבור');
+        showError('שגיאת Firebase: ' + err.message);
+    });
+}
 
 // ── Presets ───────────────────────────────────────────
 const FUND_PRESETS = [
@@ -295,19 +365,7 @@ function setSyncStatus(state, text) {
     span.textContent = text;
 }
 
-// ── Live listener ─────────────────────────────────────
 let funds = {};
-setSyncStatus('loading', 'מתחבר...');
-
-onSnapshot(collection(db, FUNDS_COL), snap => {
-    funds = {};
-    snap.forEach(d => funds[d.id] = { id: d.id, ...d.data() });
-    setSyncStatus('ok', 'מסונכרן');
-    renderFunds();
-}, err => {
-    setSyncStatus('err', 'שגיאת חיבור');
-    showError('שגיאת Firebase: ' + err.message);
-});
 
 // ── Add fund ──────────────────────────────────────────
 window.addFund = async function() {
