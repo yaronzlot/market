@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מעקב קרנות נאמנות</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0e17">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="קרנות נאמנות">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -755,6 +761,11 @@ function showInfo(msg) {
     el.textContent = msg; el.style.display = 'block';
     clearTimeout(showInfo._t);
     showInfo._t = setTimeout(() => el.style.display = 'none', 4000);
+}
+
+// ── Service Worker ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/market/sw.js');
 }
 </script>
 </body>
