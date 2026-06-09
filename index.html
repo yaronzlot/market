@@ -233,12 +233,12 @@
     <!-- Summary bar -->
     <div class="summary-grid" id="fundSummary" style="display:none; margin-bottom:20px">
         <div>
-            <div class="s-label">ערך נוכחי</div>
-            <div class="s-value" id="totalValue">₪0</div>
-        </div>
-        <div>
             <div class="s-label">השקעה</div>
             <div class="s-value" id="totalInvested">₪0</div>
+        </div>
+        <div>
+            <div class="s-label">ערך נוכחי</div>
+            <div class="s-value" id="totalValue">₪0</div>
         </div>
     </div>
 
@@ -635,8 +635,10 @@ function renderFunds() {
     }).join('');
 
     summary.style.display = 'grid';
-    document.getElementById('totalValue').textContent    = `₪${fmt(totalValue)}`;
     document.getElementById('totalInvested').textContent = `₪${fmt(totalInvested)}`;
+    const valEl = document.getElementById('totalValue');
+    valEl.textContent = `₪${fmt(totalValue)}`;
+    valEl.style.color = totalValue >= totalInvested ? 'var(--green)' : 'var(--red)';
 }
 
 // ── CSV Import ────────────────────────────────────────
