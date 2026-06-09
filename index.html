@@ -325,7 +325,6 @@ onAuthStateChanged(auth, user => {
     if (user && user.email === ALLOWED_EMAIL) {
         loginScreen.style.display = 'none';
         appScreen.style.display   = 'block';
-        document.getElementById('userEmail').textContent = user.email;
         startListening();
     } else {
         loginScreen.style.display = 'flex';
