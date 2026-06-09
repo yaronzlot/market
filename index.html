@@ -248,6 +248,19 @@
         <div id="fundList"><div class="loading">טוען נתונים מ-Firebase...</div></div>
     </div>
 
+    <!-- CSV Import -->
+    <div class="section">
+        <h2>📂 עדכון מחירים מקובץ CSV</h2>
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px">
+            העלה קובץ CSV עם עמודות <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">english_name,buy_price</code> כפי שנוצר ע"י Perplexity
+        </p>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <input type="file" id="csvFile" accept=".csv" style="flex:1; min-width:0; cursor:pointer">
+            <button class="update-btn" onclick="importCSV()">⬆ עדכן מחירים</button>
+        </div>
+        <div id="csvResult" style="margin-top:12px; font-size:13px; display:none"></div>
+    </div>
+
     <!-- Add Fund -->
     <div class="section">
         <h2>➕ הוסף קרן</h2>
@@ -625,6 +638,87 @@ function renderFunds() {
     document.getElementById('totalValue').textContent    = `₪${fmt(totalValue)}`;
     document.getElementById('totalInvested').textContent = `₪${fmt(totalInvested)}`;
 }
+
+// ── CSV Import ────────────────────────────────────────
+const CSV_NAME_MAP = {
+    'nasdaq 100 global':    '5131644',
+    'kati 25/75':           '5134028',
+    'telpazir markets':     '5135074',
+    'telpazir markets?':    '5135074',
+    'bank hapoalim':        '662577',
+    'avian 20/80':          '5107420',
+    'avivo midron+':        '5114632',
+    'sigma midron+20':      '5115514',
+    'analtest* 20/80':      '5116033',
+    'analtest 20/80':       '5116033',
+    'sigma-meyusher':       '5120613',
+    'mor david +20%':       '5121090',
+    'sigma megavit+':       '5125679',
+    'eylim 20/80':          '5125794',
+};
+
+window.importCSV = async function() {
+    const file = document.getElementById('csvFile').files[0];
+    if (!file) return showError('אנא בחר קובץ CSV');
+
+    const text = await file.text();
+    const lines = text.trim().split('\n').slice(1); // skip header
+
+    let updated = 0, notFound = [], errors = [];
+
+    for (const line of lines) {
+        if (!line.trim()) continue;
+        const parts = line.split(',');
+        if (parts.length < 2) continue;
+
+        const csvName  = parts[0].trim().toLowerCase();
+        const price    = parseFloat(parts[1].trim());
+
+        if (isNaN(price) || price <= 0) continue;
+
+        const fundId = CSV_NAME_MAP[csvName];
+        if (!fundId) { notFound.push(parts[0].trim()); continue; }
+
+        const fund = funds[fundId];
+        if (!fund) { notFound.push(parts[0].trim() + ' (לא ברשימה)'); continue; }
+
+        try {
+            const newValue  = price * fund.units;
+            const profit    = newValue - fund.totalInvested;
+            const profitPct = (profit / fund.totalInvested) * 100;
+            const nowDisplay = new Date().toLocaleString('he-IL');
+
+            await setDoc(doc(db, FUNDS_COL, fundId), {
+                ...fund,
+                currentPrice: price,
+                currentValue: newValue,
+                profit, profitPercent: profitPct,
+                lastUpdated: nowDisplay
+            });
+
+            await addDoc(collection(db, FUNDS_COL, fundId, HISTORY_COL), {
+                price, value: newValue, profit,
+                profitPercent: profitPct,
+                timestamp: new Date().toISOString(),
+                dateDisplay: nowDisplay
+            });
+
+            updated++;
+        } catch(e) {
+            errors.push(parts[0].trim());
+        }
+    }
+
+    const resultEl = document.getElementById('csvResult');
+    resultEl.style.display = 'block';
+
+    let msg = `<span style="color:var(--green)">✅ עודכנו ${updated} קרנות</span>`;
+    if (notFound.length > 0) msg += `<br><span style="color:var(--yellow)">⚠️ לא נמצאו: ${notFound.join(', ')}</span>`;
+    if (errors.length > 0)   msg += `<br><span style="color:var(--red)">❌ שגיאות: ${errors.join(', ')}</span>`;
+    resultEl.innerHTML = msg;
+
+    document.getElementById('csvFile').value = '';
+};
 
 // ── Helpers ───────────────────────────────────────────
 function clearForm() {
