@@ -237,6 +237,9 @@
     <div id="infoMsg" class="info-msg"></div>
 
     <!-- Summary bar -->
+    <div id="lastUpdateBar" style="display:none; text-align:center; font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:6px" id="lastUpdateBar">
+        עדכון אחרון: <span id="lastUpdateDate"></span>
+    </div>
     <div class="summary-grid" id="fundSummary" style="display:none; margin-bottom:8px">
         <div>
             <div class="s-label">השקעה</div>
@@ -369,6 +372,16 @@ function startListening() {
         setSyncStatus('err', 'שגיאת חיבור');
         showError('שגיאת Firebase: ' + err.message);
     });
+
+    // טען תאריך עדכון אחרון
+    getDocs(collection(db, 'meta')).then(snap => {
+        snap.forEach(d => {
+            if (d.id === 'lastCsvUpdate' && d.data().date) {
+                document.getElementById('lastUpdateDate').textContent = d.data().date;
+                document.getElementById('lastUpdateBar').style.display = 'block';
+            }
+        });
+    }).catch(() => {});
 }
 
 // ── Presets ───────────────────────────────────────────
@@ -738,6 +751,14 @@ window.importCSV = async function() {
     if (notFound.length > 0) msg += `<br><span style="color:var(--yellow)">⚠️ לא נמצאו: ${notFound.join(', ')}</span>`;
     if (errors.length > 0)   msg += `<br><span style="color:var(--red)">❌ שגיאות: ${errors.join(', ')}</span>`;
     resultEl.innerHTML = msg;
+
+    if (updated > 0) {
+        const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+        document.getElementById('lastUpdateDate').textContent = now;
+        document.getElementById('lastUpdateBar').style.display = 'block';
+        // שמור ב-Firebase
+        await setDoc(doc(db, 'meta', 'lastCsvUpdate'), { date: now });
+    }
 
     document.getElementById('csvFile').value = '';
 };
