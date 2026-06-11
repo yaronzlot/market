@@ -237,7 +237,7 @@
     <div id="infoMsg" class="info-msg"></div>
 
     <!-- Summary bar -->
-    <div id="lastUpdateBar" style="display:none; text-align:center; font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:6px" id="lastUpdateBar">
+    <div id="lastUpdateBar" style="display:none; text-align:center; font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:6px">
         עדכון אחרון: <span id="lastUpdateDate"></span>
     </div>
     <div class="summary-grid" id="fundSummary" style="display:none; margin-bottom:8px">
@@ -541,18 +541,35 @@ window.showChart = async function(id) {
             return;
         }
 
-        const dates  = [], prices = [], values = [], profits = [];
+        const dates  = [], prices = [], values = [], profits = [], profitShekels = [];
         snap.forEach(d => {
             const h = d.data();
             dates.push(h.dateDisplay);
             prices.push(h.price);
             values.push(h.value);
             profits.push(h.profitPercent);
+            profitShekels.push(h.profit || 0);
         });
 
-        Plotly.newPlot('chartDiv', [
+        // צבע לפי רווח/הפסד סופי
+        const lastProfit = profits[profits.length - 1];
+        const lineColor  = lastProfit >= 0 ? '#00e676' : '#ff1744';
+        const lastProfitShekels = profitShekels[profitShekels.length - 1];
+        const profitSign = lastProfit >= 0 ? '+' : '';
+
+        // כותרת רווח/הפסד מעל הגרף
+        document.getElementById('chartDiv').innerHTML = `
+            <div style="text-align:center; padding:10px 0 4px; font-family:var(--mono)">
+                <span style="font-size:11px; color:var(--text-dim)">רווח / הפסד נוכחי &nbsp;</span>
+                <span style="font-size:18px; font-weight:700; color:${lineColor}">
+                    ${profitSign}₪${fmt(lastProfitShekels)} (${profitSign}${lastProfit.toFixed(2)}%)
+                </span>
+            </div>
+            <div id="plotlyChart"></div>`;
+
+        Plotly.newPlot('plotlyChart', [
             { x: dates, y: prices, type: 'scatter', mode: 'lines+markers', name: 'מחיר יחידה (₪)', line: { color: '#00d4ff', width: 2 }, marker: { size: 6 } },
-            { x: dates, y: values, type: 'scatter', mode: 'lines+markers', name: 'ערך כולל (₪)', line: { color: '#00e676', width: 2 }, marker: { size: 6 }, yaxis: 'y2' }
+            { x: dates, y: values, type: 'scatter', mode: 'lines+markers', name: 'ערך כולל (₪)', line: { color: lineColor, width: 2 }, marker: { size: 6 }, yaxis: 'y2' }
         ], {
             paper_bgcolor: '#111827', plot_bgcolor: '#111827',
             font: { family: 'IBM Plex Mono', color: '#e2e8f0', size: 11 },
@@ -560,30 +577,31 @@ window.showChart = async function(id) {
             yaxis: { title: 'מחיר יחידה', color: '#64748b', gridcolor: '#1f2d44' },
             yaxis2: { title: 'ערך כולל', overlaying: 'y', side: 'left', color: '#64748b' },
             legend: { bgcolor: 'transparent' },
-            margin: { l: 60, r: 20, t: 20, b: 60 },
-            height: 300
+            margin: { l: 60, r: 20, t: 10, b: 60 },
+            height: 260
         }, { responsive: true, displayModeBar: false });
 
-        // History table
+        // History table עם עמודת רווח בשקלים
         const rows = [...snap.docs].reverse().slice(0, 10).map(d => {
             const h = d.data();
-            const sign = h.profitPercent >= 0 ? '+' : '';
+            const sign  = h.profitPercent >= 0 ? '+' : '';
             const color = h.profitPercent >= 0 ? 'var(--green)' : 'var(--red)';
+            const pShek = h.profit || 0;
             return `<tr>
-                <td style="color:var(--text-dim);font-size:12px">${h.dateDisplay}</td>
-                <td style="font-family:var(--mono)">₪${h.price.toFixed(2)}</td>
-                <td style="font-family:var(--mono)">₪${fmt(h.value)}</td>
-                <td style="font-family:var(--mono);color:${color}">${sign}${h.profitPercent.toFixed(2)}%</td>
+                <td style="color:var(--text-dim);font-size:11px;padding:5px 4px">${h.dateDisplay}</td>
+                <td style="font-family:var(--mono);padding:5px 4px">₪${h.price.toFixed(2)}</td>
+                <td style="font-family:var(--mono);padding:5px 4px">₪${fmt(h.value)}</td>
+                <td style="font-family:var(--mono);color:${color};padding:5px 4px">${sign}₪${fmt(pShek)}<br><span style="font-size:10px">${sign}${h.profitPercent.toFixed(2)}%</span></td>
             </tr>`;
         }).join('');
 
         document.getElementById('historyTable').innerHTML = `
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
                 <thead><tr style="color:var(--text-dim);font-size:11px;font-family:var(--mono)">
                     <th style="text-align:right;padding:6px 4px">תאריך</th>
                     <th style="text-align:right;padding:6px 4px">מחיר יחידה</th>
                     <th style="text-align:right;padding:6px 4px">ערך כולל</th>
-                    <th style="text-align:right;padding:6px 4px">תשואה</th>
+                    <th style="text-align:right;padding:6px 4px">רווח/הפסד</th>
                 </tr></thead>
                 <tbody>${rows}</tbody>
             </table>`;
@@ -595,7 +613,8 @@ window.showChart = async function(id) {
 
 window.closeChartModal = function() {
     document.getElementById('modalOverlay').classList.remove('open');
-    Plotly.purge('chartDiv');
+    const pc = document.getElementById('plotlyChart');
+    if (pc) Plotly.purge(pc);
 };
 window.closeModal = function(e) {
     if (e.target === document.getElementById('modalOverlay')) window.closeChartModal();
@@ -627,7 +646,7 @@ function renderFunds() {
             <div class="fund-header">
                 <div>
                     <div class="fund-name">${escHtml(f.name)}</div>
-                    <div class="fund-meta">מס׳ ${f.number} · ${f.units} יחידות @ ₪${f.buyPrice.toFixed(2)}</div>
+                    <div class="fund-meta">מס׳ ${f.number} · ${f.units} יחידות @ ₪${(f.buyPrice||0).toFixed(2)}</div>
                     <div class="last-update">${lastUpd}</div>
                 </div>
                 <div class="fund-actions-top">
@@ -646,11 +665,11 @@ function renderFunds() {
                 </div>
                 <div>
                     <div class="stat-label">רווח/הפסד</div>
-                    <div class="stat-value ${pClass}">${pSign}₪${fmt(f.profit)}<br><span style="font-size:12px">${pSign}${f.profitPercent.toFixed(2)}%</span></div>
+                    <div class="stat-value ${pClass}">${pSign}₪${fmt(f.profit||0)}<br><span style="font-size:12px">${pSign}${(f.profitPercent||0).toFixed(2)}%</span></div>
                 </div>
             </div>
             <div class="fund-update">
-                <input type="number" id="price_${f.id}" value="${f.currentPrice.toFixed(2)}" step="any" placeholder="מחיר יחידה חדש">
+                <input type="number" id="price_${f.id}" value="${(f.currentPrice||0).toFixed(2)}" step="any" placeholder="מחיר יחידה חדש">
                 <button class="update-btn sm" onclick="updatePrice('${f.id}')">עדכן מחיר</button>
                 <span class="update-hint">מחיר ממיטב →</span>
             </div>
