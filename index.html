@@ -13,6 +13,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --bg: #0a0e17;
@@ -360,7 +362,7 @@
                 <div class="sync-dot" id="syncDot"></div>
                 <span id="syncText">מתחבר...</span>
             </div>
-            <button class="report-btn" onclick="openReport()">📊 דו"ח</button>
+            <button class="report-btn" id="pdfBtn" onclick="downloadPDF()">📄 דו"ח PDF</button>
             <button class="logout-btn" onclick="logout()">
                 יציאה ↩
             </button>
@@ -425,82 +427,6 @@
 </div><!-- /appScreen -->
 
 <!-- Report Modal -->
-<div class="report-modal-overlay" id="reportModalOverlay" onclick="closeReportModal(event)">
-    <div class="report-modal">
-        <div class="report-modal-header">
-            <div>
-                <div class="report-title">📊 דו"ח תיק השקעות</div>
-                <div class="report-date-sub" id="reportDateSub"></div>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-                <button class="print-btn" onclick="printReport()">📄 הורד PDF</button>
-                <button class="danger sm" onclick="closeReportModalBtn()">✕ סגור</button>
-            </div>
-        </div>
-
-        <div id="reportLoading" class="loading">מכין דו"ח...</div>
-
-        <div id="reportContent" style="display:none">
-            <!-- 3 cards -->
-            <div class="r-summary-row">
-                <div class="r-card">
-                    <div class="r-label">סה"כ השקעה</div>
-                    <div class="r-value" id="rCardInvested">—</div>
-                </div>
-                <div class="r-card">
-                    <div class="r-label">ערך נוכחי</div>
-                    <div class="r-value" id="rCardValue">—</div>
-                </div>
-                <div class="r-card highlight">
-                    <div class="r-label">רווח / הפסד</div>
-                    <div class="r-value" id="rCardProfit">—</div>
-                </div>
-            </div>
-
-            <!-- Ranked table -->
-            <div class="r-table-wrap">
-                <div class="r-table-head">🏆 דירוג קרנות — מהטובה לגרועה</div>
-                <!-- Desktop table -->
-                <table class="r-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>קרן</th>
-                            <th>השקעה</th>
-                            <th>ערך נוכחי</th>
-                            <th>רווח / הפסד</th>
-                            <th>%</th>
-                        </tr>
-                    </thead>
-                    <tbody id="rTableBody"></tbody>
-                </table>
-                <!-- Mobile cards -->
-                <div class="r-cards" id="rCards"></div>
-            </div>
-
-            <!-- Footer totals -->
-            <div class="r-footer">
-                <div>
-                    <div class="r-footer-label">מספר קרנות</div>
-                    <div class="r-footer-value" id="rFsCount">—</div>
-                </div>
-                <div>
-                    <div class="r-footer-label">סה"כ השקעה</div>
-                    <div class="r-footer-value" id="rFsInvested">—</div>
-                </div>
-                <div>
-                    <div class="r-footer-label">ערך נוכחי</div>
-                    <div class="r-footer-value" id="rFsValue">—</div>
-                </div>
-                <div>
-                    <div class="r-footer-label">רווח / הפסד כולל</div>
-                    <div class="r-footer-value" id="rFsProfit">—</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Chart Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
     <div class="modal">
@@ -1069,154 +995,94 @@ function showInfo(msg) {
 }
 
 // ── Report Modal ──────────────────────────────────────
-window.openReport = function() {
-    document.getElementById('reportModalOverlay').classList.add('open');
-    document.getElementById('reportLoading').style.display = 'block';
-    document.getElementById('reportContent').style.display = 'none';
+window.downloadPDF = async function() {
+    const btn = document.getElementById('pdfBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ מכין...';
 
-    const arr = Object.values(funds);
-    if (arr.length === 0) {
-        document.getElementById('reportLoading').textContent = 'אין קרנות בתיק';
-        return;
+    try {
+        // Sort by absolute profit (shekel) descending
+        const sorted = [...Object.values(funds)].sort((a, b) => (b.profit || 0) - (a.profit || 0));
+        if (!sorted.length) return;
+
+        const totalInvested = sorted.reduce((s, f) => s + (f.totalInvested || 0), 0);
+        const totalValue    = sorted.reduce((s, f) => s + (f.currentValue  || 0), 0);
+        const totalProfit   = totalValue - totalInvested;
+        const totalPct      = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+        const sign          = totalProfit >= 0 ? '+' : '';
+        const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+        // Populate hidden print div
+        document.getElementById('prDate').textContent        = 'נוצר ב: ' + now;
+        document.getElementById('prInvested').textContent    = '₪' + fmt(totalInvested);
+        document.getElementById('prValue').textContent       = '₪' + fmt(totalValue);
+        document.getElementById('prProfit').textContent      = sign + '₪' + fmt(totalProfit);
+        document.getElementById('prCount').textContent       = sorted.length;
+        document.getElementById('prFsInvested').textContent  = '₪' + fmt(totalInvested);
+        document.getElementById('prFsValue').textContent     = '₪' + fmt(totalValue);
+        document.getElementById('prFsProfit').textContent    = sign + '₪' + fmt(totalProfit) + ' (' + sign + totalPct.toFixed(2) + '%)';
+
+        document.getElementById('prTableBody').innerHTML = sorted.map((f, i) => {
+            const rank  = i + 1;
+            const medal = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank;
+            const s     = (f.profit || 0) >= 0 ? '+' : '';
+            const gc    = (f.profit||0) >= 0 ? '#16a34a' : '#dc2626';
+            const gp    = (f.profitPercent||0) >= 0 ? '#16a34a' : '#dc2626';
+            return `<tr>
+                <td>${medal}</td>
+                <td style="font-weight:600">${escHtml(f.name)}</td>
+                <td style="font-family:monospace;font-size:11px;color:#555">${f.number}</td>
+                <td style="font-family:monospace">₪${fmt(f.totalInvested)}</td>
+                <td style="font-family:monospace">₪${fmt(f.currentValue)}</td>
+                <td style="font-family:monospace;font-weight:700;color:${gc}">${s}₪${fmt(f.profit||0)}</td>
+                <td style="font-family:monospace;color:${gp}">${s}${(f.profitPercent||0).toFixed(2)}%</td>
+            </tr>`;
+        }).join('');
+
+        // Show the hidden div briefly for html2canvas
+        const el = document.getElementById('printReport');
+        el.style.display = 'block';
+        el.style.position = 'fixed';
+        el.style.top = '-9999px';
+        el.style.left = '0';
+        el.style.width = '900px';
+        el.style.background = '#fff';
+        el.style.zIndex = '-1';
+
+        await new Promise(r => setTimeout(r, 100));
+
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+
+        el.style.display = 'none';
+        el.style.position = '';
+        el.style.top = '';
+        el.style.left = '';
+        el.style.width = '';
+        el.style.zIndex = '';
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const imgW  = pageW;
+        const imgH  = (canvas.height * imgW) / canvas.width;
+
+        let y = 0;
+        while (y < imgH) {
+            if (y > 0) pdf.addPage();
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, -y, imgW, imgH);
+            y += pageH;
+        }
+
+        const dateStr = new Date().toLocaleDateString('he-IL').replace(/\//g, '-');
+        pdf.save(`דוח-קרנות-${dateStr}.pdf`);
+
+    } catch(e) {
+        showError('שגיאה ביצירת PDF: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '📄 דו"ח PDF';
     }
-
-    // Sort best → worst by profitPercent
-    const sorted = [...arr].sort((a, b) => (b.profitPercent || 0) - (a.profitPercent || 0));
-
-    const totalInvested = sorted.reduce((s, f) => s + (f.totalInvested || 0), 0);
-    const totalValue    = sorted.reduce((s, f) => s + (f.currentValue  || 0), 0);
-    const totalProfit   = totalValue - totalInvested;
-    const totalPct      = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
-    const sign          = totalProfit >= 0 ? '+' : '';
-    const color         = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
-
-    // Date
-    document.getElementById('reportDateSub').textContent =
-        'נוצר ב: ' + new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-
-    // Cards
-    document.getElementById('rCardInvested').textContent = '₪' + fmt(totalInvested);
-    const rCardVal = document.getElementById('rCardValue');
-    rCardVal.textContent = '₪' + fmt(totalValue);
-    rCardVal.style.color = totalValue >= totalInvested ? 'var(--green)' : 'var(--red)';
-    const rCardP = document.getElementById('rCardProfit');
-    rCardP.textContent = `${sign}₪${fmt(totalProfit)}`;
-    rCardP.style.color = color;
-
-    // Table (desktop) + Cards (mobile)
-    const maxAbsPct = Math.max(...sorted.map(f => Math.abs(f.profitPercent || 0)), 0.01);
-    const rows = sorted.map((f, i) => {
-        const rank    = i + 1;
-        const isGreen = (f.profitPercent || 0) >= 0;
-        const c       = isGreen ? 'var(--green)' : 'var(--red)';
-        const s       = (f.profit || 0) >= 0 ? '+' : '';
-        const barW    = (Math.abs(f.profitPercent || 0) / maxAbsPct * 100).toFixed(1);
-        const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-        return { rank, f, c, s, barW, medal };
-    });
-
-    document.getElementById('rTableBody').innerHTML = rows.map(({ rank, f, c, s, barW, medal }) =>
-        `<tr>
-            <td class="r-rank">${medal}</td>
-            <td>
-                <div class="r-fund-name">${escHtml(f.name)}</div>
-                <div class="r-fund-num">${f.number}</div>
-            </td>
-            <td class="r-mono">₪${fmt(f.totalInvested)}</td>
-            <td class="r-mono">₪${fmt(f.currentValue)}</td>
-            <td class="r-profit" style="color:${c}">
-                ${s}₪${fmt(f.profit || 0)}
-                <div class="r-bar-wrap"><div class="r-bar-fill" style="width:${barW}%;background:${c}"></div></div>
-            </td>
-            <td class="r-mono" style="color:${c};font-size:12px">${s}${(f.profitPercent || 0).toFixed(2)}%</td>
-        </tr>`
-    ).join('');
-
-    document.getElementById('rCards').innerHTML = rows.map(({ rank, f, c, s, medal }) =>
-        `<div class="r-fund-card">
-            <div class="r-card-top">
-                <div class="r-card-left">
-                    <span class="r-card-medal">${medal}</span>
-                    <div>
-                        <div class="r-card-name">${escHtml(f.name)}</div>
-                        <div class="r-card-num">${f.number}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="r-card-stats">
-                <div>
-                    <div class="r-stat-label">השקעה</div>
-                    <div class="r-stat-val">₪${fmt(f.totalInvested)}</div>
-                </div>
-                <div>
-                    <div class="r-stat-label">ערך נוכחי</div>
-                    <div class="r-stat-val">₪${fmt(f.currentValue)}</div>
-                </div>
-                <div>
-                    <div class="r-stat-label">רווח/הפסד</div>
-                    <div class="r-stat-val" style="color:${c}">${s}₪${fmt(f.profit || 0)}<br><span style="font-size:11px">${s}${(f.profitPercent || 0).toFixed(2)}%</span></div>
-                </div>
-            </div>
-        </div>`
-    ).join('');
-
-    // Footer
-    document.getElementById('rFsCount').textContent    = sorted.length;
-    document.getElementById('rFsInvested').textContent = '₪' + fmt(totalInvested);
-    const rFsV = document.getElementById('rFsValue');
-    rFsV.textContent = '₪' + fmt(totalValue);
-    rFsV.style.color = totalValue >= totalInvested ? 'var(--green)' : 'var(--red)';
-    const rFsP = document.getElementById('rFsProfit');
-    rFsP.textContent = `${sign}₪${fmt(totalProfit)} (${sign}${totalPct.toFixed(2)}%)`;
-    rFsP.style.color = color;
-
-    document.getElementById('reportLoading').style.display = 'none';
-    document.getElementById('reportContent').style.display = 'block';
-};
-
-window.printReport = function() {
-    const sorted = [...Object.values(funds)].sort((a, b) => (b.profitPercent || 0) - (a.profitPercent || 0));
-    if (!sorted.length) return;
-
-    const totalInvested = sorted.reduce((s, f) => s + (f.totalInvested || 0), 0);
-    const totalValue    = sorted.reduce((s, f) => s + (f.currentValue  || 0), 0);
-    const totalProfit   = totalValue - totalInvested;
-    const totalPct      = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
-    const sign          = totalProfit >= 0 ? '+' : '';
-
-    const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    document.getElementById('prDate').textContent = 'נוצר ב: ' + now;
-    document.getElementById('prInvested').textContent = '₪' + fmt(totalInvested);
-    document.getElementById('prValue').textContent    = '₪' + fmt(totalValue);
-    document.getElementById('prProfit').textContent   = sign + '₪' + fmt(totalProfit);
-    document.getElementById('prCount').textContent    = sorted.length;
-    document.getElementById('prFsInvested').textContent = '₪' + fmt(totalInvested);
-    document.getElementById('prFsValue').textContent    = '₪' + fmt(totalValue);
-    document.getElementById('prFsProfit').textContent   = sign + '₪' + fmt(totalProfit) + ' (' + sign + totalPct.toFixed(2) + '%)';
-
-    document.getElementById('prTableBody').innerHTML = sorted.map((f, i) => {
-        const rank  = i + 1;
-        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-        const s     = (f.profit || 0) >= 0 ? '+' : '';
-        return `<tr>
-            <td>${medal}</td>
-            <td style="font-weight:600">${escHtml(f.name)}</td>
-            <td style="font-family:monospace;font-size:11px;color:#555">${f.number}</td>
-            <td style="font-family:monospace">₪${fmt(f.totalInvested)}</td>
-            <td style="font-family:monospace">₪${fmt(f.currentValue)}</td>
-            <td style="font-family:monospace;font-weight:700;color:${(f.profit||0)>=0?'#16a34a':'#dc2626'}">${s}₪${fmt(f.profit||0)}</td>
-            <td style="font-family:monospace;color:${(f.profitPercent||0)>=0?'#16a34a':'#dc2626'}">${s}${(f.profitPercent||0).toFixed(2)}%</td>
-        </tr>`;
-    }).join('');
-
-    window.print();
-};
-
-window.closeReportModalBtn = function() {
-    document.getElementById('reportModalOverlay').classList.remove('open');
-};
-window.closeReportModal = function(e) {
-    if (e.target === document.getElementById('reportModalOverlay')) window.closeReportModalBtn();
 };
 
 // ── Service Worker ────────────────────────────────────
