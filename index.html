@@ -240,6 +240,7 @@
             padding: 13px 18px; border-bottom: 1px solid var(--border);
             font-size: 13px; font-weight: 700;
         }
+        /* Desktop table */
         .r-table { width: 100%; border-collapse: collapse; }
         .r-table thead th {
             padding: 10px 14px; text-align: right;
@@ -251,14 +252,30 @@
         .r-table tbody tr { border-bottom: 1px solid var(--border); }
         .r-table tbody tr:last-child { border-bottom: none; }
         .r-table tbody tr:hover { background: rgba(255,255,255,0.02); }
-        .r-table td { padding: 13px 14px; font-size: 13px; vertical-align: middle; }
-        .r-rank { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+        .r-table td { padding: 11px 14px; font-size: 13px; vertical-align: middle; }
+        .r-rank { font-family: var(--mono); font-size: 13px; }
         .r-fund-name { font-weight: 600; }
         .r-fund-num { font-size: 10px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; }
         .r-mono { font-family: var(--mono); }
         .r-profit { font-family: var(--mono); font-weight: 700; }
         .r-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 5px; }
         .r-bar-fill { height: 3px; border-radius: 2px; }
+        /* Mobile cards */
+        .r-cards { display: none; }
+        .r-fund-card { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        .r-fund-card:last-child { border-bottom: none; }
+        .r-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .r-card-left { display: flex; align-items: center; gap: 8px; }
+        .r-card-medal { font-size: 18px; flex-shrink: 0; }
+        .r-card-name { font-weight: 700; font-size: 14px; }
+        .r-card-num { font-size: 10px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; }
+        .r-card-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .r-stat-label { font-size: 9px; color: var(--text-dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+        .r-stat-val { font-size: 13px; font-weight: 700; font-family: var(--mono); }
+        @media (max-width: 600px) {
+            .r-table { display: none; }
+            .r-cards { display: block; }
+        }
 
         .r-footer {
             background: var(--surface); border: 1px solid var(--border);
@@ -423,6 +440,7 @@
             <!-- Ranked table -->
             <div class="r-table-wrap">
                 <div class="r-table-head">🏆 דירוג קרנות — מהטובה לגרועה</div>
+                <!-- Desktop table -->
                 <table class="r-table">
                     <thead>
                         <tr>
@@ -436,6 +454,8 @@
                     </thead>
                     <tbody id="rTableBody"></tbody>
                 </table>
+                <!-- Mobile cards -->
+                <div class="r-cards" id="rCards"></div>
             </div>
 
             <!-- Footer totals -->
@@ -1009,16 +1029,20 @@ window.openReport = function() {
     rCardP.textContent = `${sign}₪${fmt(totalProfit)}`;
     rCardP.style.color = color;
 
-    // Table
+    // Table (desktop) + Cards (mobile)
     const maxAbsPct = Math.max(...sorted.map(f => Math.abs(f.profitPercent || 0)), 0.01);
-    document.getElementById('rTableBody').innerHTML = sorted.map((f, i) => {
+    const rows = sorted.map((f, i) => {
         const rank    = i + 1;
         const isGreen = (f.profitPercent || 0) >= 0;
         const c       = isGreen ? 'var(--green)' : 'var(--red)';
         const s       = (f.profit || 0) >= 0 ? '+' : '';
         const barW    = (Math.abs(f.profitPercent || 0) / maxAbsPct * 100).toFixed(1);
         const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-        return `<tr>
+        return { rank, f, c, s, barW, medal };
+    });
+
+    document.getElementById('rTableBody').innerHTML = rows.map(({ rank, f, c, s, barW, medal }) =>
+        `<tr>
             <td class="r-rank">${medal}</td>
             <td>
                 <div class="r-fund-name">${escHtml(f.name)}</div>
@@ -1031,8 +1055,36 @@ window.openReport = function() {
                 <div class="r-bar-wrap"><div class="r-bar-fill" style="width:${barW}%;background:${c}"></div></div>
             </td>
             <td class="r-mono" style="color:${c};font-size:12px">${s}${(f.profitPercent || 0).toFixed(2)}%</td>
-        </tr>`;
-    }).join('');
+        </tr>`
+    ).join('');
+
+    document.getElementById('rCards').innerHTML = rows.map(({ rank, f, c, s, medal }) =>
+        `<div class="r-fund-card">
+            <div class="r-card-top">
+                <div class="r-card-left">
+                    <span class="r-card-medal">${medal}</span>
+                    <div>
+                        <div class="r-card-name">${escHtml(f.name)}</div>
+                        <div class="r-card-num">${f.number}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="r-card-stats">
+                <div>
+                    <div class="r-stat-label">השקעה</div>
+                    <div class="r-stat-val">₪${fmt(f.totalInvested)}</div>
+                </div>
+                <div>
+                    <div class="r-stat-label">ערך נוכחי</div>
+                    <div class="r-stat-val">₪${fmt(f.currentValue)}</div>
+                </div>
+                <div>
+                    <div class="r-stat-label">רווח/הפסד</div>
+                    <div class="r-stat-val" style="color:${c}">${s}₪${fmt(f.profit || 0)}<br><span style="font-size:11px">${s}${(f.profitPercent || 0).toFixed(2)}%</span></div>
+                </div>
+            </div>
+        </div>`
+    ).join('');
 
     // Footer
     document.getElementById('rFsCount').textContent    = sorted.length;
