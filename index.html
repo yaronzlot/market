@@ -196,6 +196,102 @@
         #chartDiv { height: 320px; }
 
         .loading { text-align: center; color: var(--text-dim); padding: 20px; font-size: 13px; }
+
+        /* Report modal */
+        .report-modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.85); z-index: 200;
+            align-items: flex-start; justify-content: center;
+            padding: 20px; overflow-y: auto;
+        }
+        .report-modal-overlay.open { display: flex; }
+        .report-modal {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px;
+            width: 100%; max-width: 780px;
+            margin: auto;
+        }
+        .report-modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; padding-bottom: 16px;
+            border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px;
+        }
+        .report-title { font-size: 1.2rem; font-weight: 700; }
+        .report-date-sub { font-size: 11px; color: var(--text-dim); font-family: var(--mono); margin-top: 3px; }
+
+        .r-summary-row {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; margin-bottom: 24px;
+        }
+        @media (max-width: 500px) { .r-summary-row { grid-template-columns: 1fr 1fr; } }
+        .r-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px;
+        }
+        .r-card.highlight { border-color: rgba(245,158,11,0.35); }
+        .r-label { font-size: 10px; color: var(--text-dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 6px; }
+        .r-value { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+
+        .r-table-wrap {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; overflow: hidden; margin-bottom: 20px;
+        }
+        .r-table-head {
+            padding: 13px 18px; border-bottom: 1px solid var(--border);
+            font-size: 13px; font-weight: 700;
+        }
+        .r-table { width: 100%; border-collapse: collapse; }
+        .r-table thead th {
+            padding: 10px 14px; text-align: right;
+            font-size: 10px; font-family: var(--mono);
+            text-transform: uppercase; letter-spacing: 0.7px;
+            color: var(--text-dim); background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+        }
+        .r-table tbody tr { border-bottom: 1px solid var(--border); }
+        .r-table tbody tr:last-child { border-bottom: none; }
+        .r-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+        .r-table td { padding: 13px 14px; font-size: 13px; vertical-align: middle; }
+        .r-rank { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+        .r-fund-name { font-weight: 600; }
+        .r-fund-num { font-size: 10px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; }
+        .r-mono { font-family: var(--mono); }
+        .r-profit { font-family: var(--mono); font-weight: 700; }
+        .r-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 5px; }
+        .r-bar-fill { height: 3px; border-radius: 2px; }
+
+        .r-footer {
+            background: var(--surface); border: 1px solid var(--border);
+            border-top: 3px solid var(--yellow);
+            border-radius: 10px; padding: 18px;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+        }
+        @media (max-width: 500px) { .r-footer { grid-template-columns: 1fr 1fr; } }
+        .r-footer-label { font-size: 10px; color: var(--text-dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 5px; }
+        .r-footer-value { font-size: 17px; font-weight: 700; font-family: var(--mono); }
+
+        .report-btn {
+            background: rgba(245,158,11,0.15) !important;
+            color: var(--yellow) !important;
+            border: 1px solid rgba(245,158,11,0.35) !important;
+            padding: 5px 10px !important;
+            font-size: 11px !important;
+            border-radius: 6px !important;
+            font-family: var(--mono) !important;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .report-btn:hover { background: rgba(245,158,11,0.25) !important; }
+        .print-btn {
+            background: transparent !important;
+            color: var(--text-dim) !important;
+            border: 1px solid var(--border) !important;
+            padding: 5px 10px !important;
+            font-size: 11px !important;
+            border-radius: 6px !important;
+            font-family: var(--mono) !important;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -227,6 +323,7 @@
                 <div class="sync-dot" id="syncDot"></div>
                 <span id="syncText">מתחבר...</span>
             </div>
+            <button class="report-btn" onclick="openReport()">📊 דו"ח</button>
             <button class="logout-btn" onclick="logout()">
                 יציאה ↩
             </button>
@@ -289,6 +386,80 @@
 
 </div><!-- /container -->
 </div><!-- /appScreen -->
+
+<!-- Report Modal -->
+<div class="report-modal-overlay" id="reportModalOverlay" onclick="closeReportModal(event)">
+    <div class="report-modal">
+        <div class="report-modal-header">
+            <div>
+                <div class="report-title">📊 דו"ח תיק השקעות</div>
+                <div class="report-date-sub" id="reportDateSub"></div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <button class="print-btn" onclick="window.print()">🖨 הדפסה</button>
+                <button class="danger sm" onclick="closeReportModalBtn()">✕ סגור</button>
+            </div>
+        </div>
+
+        <div id="reportLoading" class="loading">מכין דו"ח...</div>
+
+        <div id="reportContent" style="display:none">
+            <!-- 3 cards -->
+            <div class="r-summary-row">
+                <div class="r-card">
+                    <div class="r-label">סה"כ השקעה</div>
+                    <div class="r-value" id="rCardInvested">—</div>
+                </div>
+                <div class="r-card">
+                    <div class="r-label">ערך נוכחי</div>
+                    <div class="r-value" id="rCardValue">—</div>
+                </div>
+                <div class="r-card highlight">
+                    <div class="r-label">רווח / הפסד</div>
+                    <div class="r-value" id="rCardProfit">—</div>
+                </div>
+            </div>
+
+            <!-- Ranked table -->
+            <div class="r-table-wrap">
+                <div class="r-table-head">🏆 דירוג קרנות — מהטובה לגרועה</div>
+                <table class="r-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>קרן</th>
+                            <th>השקעה</th>
+                            <th>ערך נוכחי</th>
+                            <th>רווח / הפסד</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Footer totals -->
+            <div class="r-footer">
+                <div>
+                    <div class="r-footer-label">מספר קרנות</div>
+                    <div class="r-footer-value" id="rFsCount">—</div>
+                </div>
+                <div>
+                    <div class="r-footer-label">סה"כ השקעה</div>
+                    <div class="r-footer-value" id="rFsInvested">—</div>
+                </div>
+                <div>
+                    <div class="r-footer-label">ערך נוכחי</div>
+                    <div class="r-footer-value" id="rFsValue">—</div>
+                </div>
+                <div>
+                    <div class="r-footer-label">רווח / הפסד כולל</div>
+                    <div class="r-footer-value" id="rFsProfit">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Chart Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
@@ -802,6 +973,87 @@ function showInfo(msg) {
     clearTimeout(showInfo._t);
     showInfo._t = setTimeout(() => el.style.display = 'none', 4000);
 }
+
+// ── Report Modal ──────────────────────────────────────
+window.openReport = function() {
+    document.getElementById('reportModalOverlay').classList.add('open');
+    document.getElementById('reportLoading').style.display = 'block';
+    document.getElementById('reportContent').style.display = 'none';
+
+    const arr = Object.values(funds);
+    if (arr.length === 0) {
+        document.getElementById('reportLoading').textContent = 'אין קרנות בתיק';
+        return;
+    }
+
+    // Sort best → worst by profitPercent
+    const sorted = [...arr].sort((a, b) => (b.profitPercent || 0) - (a.profitPercent || 0));
+
+    const totalInvested = sorted.reduce((s, f) => s + (f.totalInvested || 0), 0);
+    const totalValue    = sorted.reduce((s, f) => s + (f.currentValue  || 0), 0);
+    const totalProfit   = totalValue - totalInvested;
+    const totalPct      = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+    const sign          = totalProfit >= 0 ? '+' : '';
+    const color         = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
+
+    // Date
+    document.getElementById('reportDateSub').textContent =
+        'נוצר ב: ' + new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+    // Cards
+    document.getElementById('rCardInvested').textContent = '₪' + fmt(totalInvested);
+    const rCardVal = document.getElementById('rCardValue');
+    rCardVal.textContent = '₪' + fmt(totalValue);
+    rCardVal.style.color = totalValue >= totalInvested ? 'var(--green)' : 'var(--red)';
+    const rCardP = document.getElementById('rCardProfit');
+    rCardP.textContent = `${sign}₪${fmt(totalProfit)}`;
+    rCardP.style.color = color;
+
+    // Table
+    const maxAbsPct = Math.max(...sorted.map(f => Math.abs(f.profitPercent || 0)), 0.01);
+    document.getElementById('rTableBody').innerHTML = sorted.map((f, i) => {
+        const rank    = i + 1;
+        const isGreen = (f.profitPercent || 0) >= 0;
+        const c       = isGreen ? 'var(--green)' : 'var(--red)';
+        const s       = (f.profit || 0) >= 0 ? '+' : '';
+        const barW    = (Math.abs(f.profitPercent || 0) / maxAbsPct * 100).toFixed(1);
+        const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+        return `<tr>
+            <td class="r-rank">${medal}</td>
+            <td>
+                <div class="r-fund-name">${escHtml(f.name)}</div>
+                <div class="r-fund-num">${f.number}</div>
+            </td>
+            <td class="r-mono">₪${fmt(f.totalInvested)}</td>
+            <td class="r-mono">₪${fmt(f.currentValue)}</td>
+            <td class="r-profit" style="color:${c}">
+                ${s}₪${fmt(f.profit || 0)}
+                <div class="r-bar-wrap"><div class="r-bar-fill" style="width:${barW}%;background:${c}"></div></div>
+            </td>
+            <td class="r-mono" style="color:${c};font-size:12px">${s}${(f.profitPercent || 0).toFixed(2)}%</td>
+        </tr>`;
+    }).join('');
+
+    // Footer
+    document.getElementById('rFsCount').textContent    = sorted.length;
+    document.getElementById('rFsInvested').textContent = '₪' + fmt(totalInvested);
+    const rFsV = document.getElementById('rFsValue');
+    rFsV.textContent = '₪' + fmt(totalValue);
+    rFsV.style.color = totalValue >= totalInvested ? 'var(--green)' : 'var(--red)';
+    const rFsP = document.getElementById('rFsProfit');
+    rFsP.textContent = `${sign}₪${fmt(totalProfit)} (${sign}${totalPct.toFixed(2)}%)`;
+    rFsP.style.color = color;
+
+    document.getElementById('reportLoading').style.display = 'none';
+    document.getElementById('reportContent').style.display = 'block';
+};
+
+window.closeReportModalBtn = function() {
+    document.getElementById('reportModalOverlay').classList.remove('open');
+};
+window.closeReportModal = function(e) {
+    if (e.target === document.getElementById('reportModalOverlay')) window.closeReportModalBtn();
+};
 
 // ── Service Worker ────────────────────────────────────
 if ('serviceWorker' in navigator) {
