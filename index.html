@@ -1023,56 +1023,58 @@ window.downloadPDF = async function() {
 
         const rows = sorted.map((f, i) => {
             const rank = i + 1;
-            const rankLbl = rank === 1 ? '#1' : rank === 2 ? '#2' : rank === 3 ? '#3' : '#' + rank;
+            const rankLbl = '#' + rank;
             const s  = (f.profit || 0) >= 0 ? '+' : '';
             const gc = (f.profit||0) >= 0 ? '#16a34a' : '#dc2626';
             const gp = (f.profitPercent||0) >= 0 ? '#16a34a' : '#dc2626';
             return `<tr>
-                <td style="text-align:center;border:1px solid #ddd;padding:8px;font-weight:bold;">${rankLbl}</td>
-                <td style="text-align:right;border:1px solid #ddd;padding:8px;font-weight:bold;">${f.name.replace(/ /g,'\u00A0')}</td>
-                <td style="text-align:center;border:1px solid #ddd;padding:8px;font-size:11px;color:#666;">${f.number}</td>
-                <td style="text-align:center;border:1px solid #ddd;padding:8px;">&#8362;${fmt(f.totalInvested)}</td>
-                <td style="text-align:center;border:1px solid #ddd;padding:8px;">&#8362;${fmt(f.currentValue)}</td>
-                <td style="text-align:center;border:1px solid #ddd;padding:8px;font-weight:bold;color:${gc};">${s}&#8362;${fmt(f.profit||0)}</td>
-                <td style="text-align:center;border:1px solid #ddd;padding:8px;color:${gp};">${s}${(f.profitPercent||0).toFixed(2)}%</td>
+                <td style="font-weight:bold;">${rankLbl}</td>
+                <td class="name-cell">${f.name.replace(/ /g,'\u00A0')}</td>
+                <td style="font-size:11px;color:#666;">${f.number}</td>
+                <td>&#8362;${fmt(f.totalInvested)}</td>
+                <td>&#8362;${fmt(f.currentValue)}</td>
+                <td style="font-weight:bold;color:${gc};">${s}&#8362;${fmt(f.profit||0)}</td>
+                <td style="color:${gp};">${s}${(f.profitPercent||0).toFixed(2)}%</td>
             </tr>`;
         }).join('');
 
         const html = `<html><head><meta charset="utf-8"/>
         <style>
-            body { font-family: Arial, Helvetica, sans-serif; direction: rtl; text-align: right; padding: 20px; unicode-bidi: plaintext; }
-            h1 { text-align:center; color:#1e293b; margin-bottom:4px; font-size:22px; letter-spacing:2px; }
-            .date { text-align:center; color:#64748b; font-size:12px; margin-bottom:20px; }
-            .cards { display:table; width:100%; margin-bottom:20px; border-collapse:separate; border-spacing:10px; }
-            .card { display:table-cell; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; }
-            .card-label { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
-            .card-val { font-size:18px; font-weight:bold; }
-            table { width:100%; border-collapse:collapse; margin:16px 0; font-size:13px; }
-            th { background:#1e293b; color:white; padding:10px; border:1px solid #ddd; text-align:center; }
-            tr:nth-child(even) { background:#f8fafc; }
-            .footer { margin-top:20px; border-top:2px solid #1e293b; padding-top:14px; }
-            .footer-row { display:flex; justify-content:space-between; margin-bottom:6px; }
-            .f-label { color:#64748b; font-size:12px; }
-            .f-val { font-weight:bold; font-size:15px; }
+            body { font-family: Arial, Helvetica, sans-serif; direction: rtl; text-align: right; padding: 20px; unicode-bidi: plaintext; word-spacing: normal; font-size: 14px; }
+            h1 { text-align: center; color: #1e293b; margin-bottom: 4px; font-size: 22px; word-spacing: normal; letter-spacing: normal; }
+            .date { text-align: center; color: #64748b; font-size: 12px; margin-bottom: 16px; }
+            .summary-box { border: 2px solid #f59e0b; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; }
+            .summary-row { display: table; width: 100%; margin-bottom: 4px; }
+            .summary-label { display: table-cell; width: 50%; color: #64748b; font-size: 13px; }
+            .summary-val { display: table-cell; width: 50%; font-weight: bold; font-size: 15px; text-align: left; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+            td, th { word-spacing: normal; letter-spacing: normal; word-break: normal; white-space: normal; }
+            th { background: #1e293b; color: white; padding: 10px 8px; border: 1px solid #ccc; text-align: center; font-weight: bold; }
+            td { padding: 8px; border: 1px solid #ddd; text-align: center; }
+            td.name-cell { text-align: right; font-weight: bold; }
+            tr:nth-child(even) { background: #f8fafc; }
         </style>
         </head><body>
-        <h1>&#128202; דו"ח תיק קרנות נאמנות</h1>
+        <h1>דו"ח תיק קרנות נאמנות</h1>
         <div class="date">נוצר ב: ${now}</div>
-        <div class="cards">
-            <div class="card"><div class="card-label">סה"כ השקעה</div><div class="card-val">&#8362;${fmt(totalInvested)}</div></div>
-            <div class="card"><div class="card-label">ערך נוכחי</div><div class="card-val" style="color:${totalValue>=totalInvested?'#16a34a':'#dc2626'}">&#8362;${fmt(totalValue)}</div></div>
-            <div class="card"><div class="card-label">רווח / הפסד</div><div class="card-val" style="color:${profitColor}">${sign}&#8362;${fmt(totalProfit)} (${sign}${totalPct.toFixed(2)}%)</div></div>
+        <div class="summary-box">
+            <div class="summary-row">
+                <span class="summary-label">סה"כ השקעה:</span>
+                <span class="summary-val">&#8362;${fmt(totalInvested)}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">ערך נוכחי:</span>
+                <span class="summary-val" style="color:${totalValue>=totalInvested?'#16a34a':'#dc2626'}">&#8362;${fmt(totalValue)}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">רווח / הפסד:</span>
+                <span class="summary-val" style="color:${profitColor}">${sign}&#8362;${fmt(totalProfit)}&nbsp;(${sign}${totalPct.toFixed(2)}%)</span>
+            </div>
         </div>
         <table>
-            <thead><tr><th>#</th><th>שם הקרן</th><th>מספר</th><th>השקעה</th><th>ערך נוכחי</th><th>רווח/הפסד</th><th>%</th></tr></thead>
+            <thead><tr><th>#</th><th>שם&nbsp;הקרן</th><th>מספר</th><th>השקעה</th><th>ערך&nbsp;נוכחי</th><th>רווח/הפסד</th><th>%</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
-        <div class="footer">
-            <div class="footer-row"><span class="f-label">מספר קרנות:</span><span class="f-val">${sorted.length}</span></div>
-            <div class="footer-row"><span class="f-label">סה"כ השקעה:</span><span class="f-val">&#8362;${fmt(totalInvested)}</span></div>
-            <div class="footer-row"><span class="f-label">ערך נוכחי:</span><span class="f-val" style="color:${totalValue>=totalInvested?'#16a34a':'#dc2626'}">&#8362;${fmt(totalValue)}</span></div>
-            <div class="footer-row"><span class="f-label">רווח / הפסד כולל:</span><span class="f-val" style="color:${profitColor}">${sign}&#8362;${fmt(totalProfit)} (${sign}${totalPct.toFixed(2)}%)</span></div>
-        </div>
         </body></html>`;
 
         const element = document.createElement('div');
@@ -1080,10 +1082,10 @@ window.downloadPDF = async function() {
 
         const dateStr = new Date().toLocaleDateString('he-IL').replace(/[/]/g, '-');
         const opt = {
-            margin: 10,
+            margin: 8,
             filename: 'דוח-קרנות-' + dateStr + '.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
+            image: { type: 'jpeg', quality: 1.0 },
+            html2canvas: { scale: 3, useCORS: true, windowWidth: 1200, logging: false },
             jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' }
         };
 
