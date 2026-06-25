@@ -277,6 +277,26 @@
             .r-cards { display: block; }
         }
 
+        @media print {
+            body { background: #fff !important; color: #000 !important; padding: 0 !important; }
+            #loginScreen, #appScreen { display: none !important; }
+            #printReport { display: block !important; }
+            .pr-header { margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid #000; }
+            .pr-title { font-size: 20px; font-weight: 700; }
+            .pr-date { font-size: 11px; color: #555; margin-top: 3px; }
+            .pr-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
+            .pr-card { border: 1px solid #ccc; border-radius: 6px; padding: 10px 12px; }
+            .pr-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: #666; margin-bottom: 4px; }
+            .pr-val { font-size: 18px; font-weight: 700; font-family: monospace; }
+            .pr-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .pr-table th { font-size: 10px; text-transform: uppercase; color: #555; border-bottom: 1px solid #ccc; padding: 7px 8px; text-align: right; }
+            .pr-table td { padding: 9px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
+            .pr-table tr:last-child td { border-bottom: none; }
+            .pr-footer { border-top: 2px solid #000; padding-top: 14px; display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+            .pr-footer-label { font-size: 9px; text-transform: uppercase; color: #555; margin-bottom: 4px; }
+            .pr-footer-val { font-size: 16px; font-weight: 700; font-family: monospace; }
+        }
+
         .r-footer {
             background: var(--surface); border: 1px solid var(--border);
             border-top: 3px solid var(--yellow);
@@ -413,7 +433,7 @@
                 <div class="report-date-sub" id="reportDateSub"></div>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-                <button class="print-btn" onclick="window.print()">🖨 הדפסה</button>
+                <button class="print-btn" onclick="printReport()">📄 הורד PDF</button>
                 <button class="danger sm" onclick="closeReportModalBtn()">✕ סגור</button>
             </div>
         </div>
@@ -490,6 +510,60 @@
         </div>
         <div id="chartDiv"></div>
         <div id="historyTable" style="margin-top:14px"></div>
+    </div>
+</div>
+
+<!-- Hidden print report (shown only on print) -->
+<div id="printReport" style="display:none; padding:24px; font-family:Heebo,sans-serif; direction:rtl;">
+    <div class="pr-header">
+        <div class="pr-title">📊 דו"ח תיק קרנות נאמנות</div>
+        <div class="pr-date" id="prDate"></div>
+    </div>
+    <div class="pr-cards">
+        <div class="pr-card">
+            <div class="pr-label">סה"כ השקעה</div>
+            <div class="pr-val" id="prInvested">—</div>
+        </div>
+        <div class="pr-card">
+            <div class="pr-label">ערך נוכחי</div>
+            <div class="pr-val" id="prValue">—</div>
+        </div>
+        <div class="pr-card" style="border-top:3px solid #f59e0b">
+            <div class="pr-label">רווח / הפסד</div>
+            <div class="pr-val" id="prProfit">—</div>
+        </div>
+    </div>
+    <table class="pr-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>שם הקרן</th>
+                <th>מספר</th>
+                <th>השקעה (₪)</th>
+                <th>ערך נוכחי (₪)</th>
+                <th>רווח/הפסד (₪)</th>
+                <th>%</th>
+            </tr>
+        </thead>
+        <tbody id="prTableBody"></tbody>
+    </table>
+    <div class="pr-footer">
+        <div>
+            <div class="pr-footer-label">מספר קרנות</div>
+            <div class="pr-footer-val" id="prCount">—</div>
+        </div>
+        <div>
+            <div class="pr-footer-label">סה"כ השקעה</div>
+            <div class="pr-footer-val" id="prFsInvested">—</div>
+        </div>
+        <div>
+            <div class="pr-footer-label">ערך נוכחי</div>
+            <div class="pr-footer-val" id="prFsValue">—</div>
+        </div>
+        <div>
+            <div class="pr-footer-label">רווח / הפסד כולל</div>
+            <div class="pr-footer-val" id="prFsProfit">—</div>
+        </div>
     </div>
 </div>
 
@@ -1098,6 +1172,44 @@ window.openReport = function() {
 
     document.getElementById('reportLoading').style.display = 'none';
     document.getElementById('reportContent').style.display = 'block';
+};
+
+window.printReport = function() {
+    const sorted = [...Object.values(funds)].sort((a, b) => (b.profitPercent || 0) - (a.profitPercent || 0));
+    if (!sorted.length) return;
+
+    const totalInvested = sorted.reduce((s, f) => s + (f.totalInvested || 0), 0);
+    const totalValue    = sorted.reduce((s, f) => s + (f.currentValue  || 0), 0);
+    const totalProfit   = totalValue - totalInvested;
+    const totalPct      = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+    const sign          = totalProfit >= 0 ? '+' : '';
+
+    const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    document.getElementById('prDate').textContent = 'נוצר ב: ' + now;
+    document.getElementById('prInvested').textContent = '₪' + fmt(totalInvested);
+    document.getElementById('prValue').textContent    = '₪' + fmt(totalValue);
+    document.getElementById('prProfit').textContent   = sign + '₪' + fmt(totalProfit);
+    document.getElementById('prCount').textContent    = sorted.length;
+    document.getElementById('prFsInvested').textContent = '₪' + fmt(totalInvested);
+    document.getElementById('prFsValue').textContent    = '₪' + fmt(totalValue);
+    document.getElementById('prFsProfit').textContent   = sign + '₪' + fmt(totalProfit) + ' (' + sign + totalPct.toFixed(2) + '%)';
+
+    document.getElementById('prTableBody').innerHTML = sorted.map((f, i) => {
+        const rank  = i + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+        const s     = (f.profit || 0) >= 0 ? '+' : '';
+        return `<tr>
+            <td>${medal}</td>
+            <td style="font-weight:600">${escHtml(f.name)}</td>
+            <td style="font-family:monospace;font-size:11px;color:#555">${f.number}</td>
+            <td style="font-family:monospace">₪${fmt(f.totalInvested)}</td>
+            <td style="font-family:monospace">₪${fmt(f.currentValue)}</td>
+            <td style="font-family:monospace;font-weight:700;color:${(f.profit||0)>=0?'#16a34a':'#dc2626'}">${s}₪${fmt(f.profit||0)}</td>
+            <td style="font-family:monospace;color:${(f.profitPercent||0)>=0?'#16a34a':'#dc2626'}">${s}${(f.profitPercent||0).toFixed(2)}%</td>
+        </tr>`;
+    }).join('');
+
+    window.print();
 };
 
 window.closeReportModalBtn = function() {
