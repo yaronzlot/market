@@ -995,13 +995,13 @@ function showInfo(msg) {
 }
 
 // ── Report Modal ──────────────────────────────────────
-window.downloadPDF = async function() {
+window.downloadPDF = function() {
     const btn = document.getElementById('pdfBtn');
     btn.disabled = true;
     btn.textContent = '⏳ מכין...';
 
     try {
-        // Sort by absolute profit (shekel) descending
+        // Sort by profit (shekel) descending
         const sorted = [...Object.values(funds)].sort((a, b) => (b.profit || 0) - (a.profit || 0));
         if (!sorted.length) return;
 
@@ -1012,70 +1012,164 @@ window.downloadPDF = async function() {
         const sign          = totalProfit >= 0 ? '+' : '';
         const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 
-        // Populate hidden print div
-        document.getElementById('prDate').textContent        = 'נוצר ב: ' + now;
-        document.getElementById('prInvested').textContent    = '₪' + fmt(totalInvested);
-        document.getElementById('prValue').textContent       = '₪' + fmt(totalValue);
-        document.getElementById('prProfit').textContent      = sign + '₪' + fmt(totalProfit);
-        document.getElementById('prCount').textContent       = sorted.length;
-        document.getElementById('prFsInvested').textContent  = '₪' + fmt(totalInvested);
-        document.getElementById('prFsValue').textContent     = '₪' + fmt(totalValue);
-        document.getElementById('prFsProfit').textContent    = sign + '₪' + fmt(totalProfit) + ' (' + sign + totalPct.toFixed(2) + '%)';
-
-        document.getElementById('prTableBody').innerHTML = sorted.map((f, i) => {
-            const rank  = i + 1;
-            const medal = rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank;
-            const s     = (f.profit || 0) >= 0 ? '+' : '';
-            const gc    = (f.profit||0) >= 0 ? '#16a34a' : '#dc2626';
-            const gp    = (f.profitPercent||0) >= 0 ? '#16a34a' : '#dc2626';
-            return `<tr>
-                <td>${medal}</td>
-                <td style="font-weight:600">${escHtml(f.name)}</td>
-                <td style="font-family:monospace;font-size:11px;color:#555">${f.number}</td>
-                <td style="font-family:monospace">₪${fmt(f.totalInvested)}</td>
-                <td style="font-family:monospace">₪${fmt(f.currentValue)}</td>
-                <td style="font-family:monospace;font-weight:700;color:${gc}">${s}₪${fmt(f.profit||0)}</td>
-                <td style="font-family:monospace;color:${gp}">${s}${(f.profitPercent||0).toFixed(2)}%</td>
-            </tr>`;
-        }).join('');
-
-        // Show the hidden div briefly for html2canvas
-        const el = document.getElementById('printReport');
-        el.style.display = 'block';
-        el.style.position = 'fixed';
-        el.style.top = '-9999px';
-        el.style.left = '0';
-        el.style.width = '900px';
-        el.style.background = '#fff';
-        el.style.zIndex = '-1';
-
-        await new Promise(r => setTimeout(r, 100));
-
-        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-
-        el.style.display = 'none';
-        el.style.position = '';
-        el.style.top = '';
-        el.style.left = '';
-        el.style.width = '';
-        el.style.zIndex = '';
-
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const imgW  = pageW;
-        const imgH  = (canvas.height * imgW) / canvas.width;
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const W = pdf.internal.pageSize.getWidth();  // 297mm
+        const H = pdf.internal.pageSize.getHeight(); // 210mm
 
-        let y = 0;
-        while (y < imgH) {
-            if (y > 0) pdf.addPage();
-            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, -y, imgW, imgH);
-            y += pageH;
-        }
+        // ── helpers ──
+        const rText = (text, x, y, opts) => {
+            pdf.text(String(text), x, y, { align: 'right', ...opts });
+        };
+        const lText = (text, x, y, opts) => {
+            pdf.text(String(text), x, y, { align: 'left', ...opts });
+        };
+        const colorGreen = [22, 163, 74];
+        const colorRed   = [220, 38, 38];
+        const colorGray  = [100, 116, 139];
+        const colorDark  = [30, 41, 59];
 
-        const dateStr = new Date().toLocaleDateString('he-IL').replace(/\//g, '-');
-        pdf.save(`דוח-קרנות-${dateStr}.pdf`);
+        // ── Title block ──
+        pdf.setFillColor(248, 250, 252);
+        pdf.rect(0, 0, W, 22, 'F');
+        pdf.setDrawColor(245, 158, 11);
+        pdf.setLineWidth(1);
+        pdf.line(0, 22, W, 22);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(16);
+        pdf.setTextColor(...colorDark);
+        rText('דו"ח תיק קרנות נאמנות', W - 10, 10);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(...colorGray);
+        rText('נוצר ב: ' + now, W - 10, 17);
+
+        // ── Summary cards ──
+        const cards = [
+            { label: 'סה"כ השקעה', value: 'ILS ' + fmt(totalInvested), color: colorDark },
+            { label: 'ערך נוכחי',   value: 'ILS ' + fmt(totalValue),    color: totalValue >= totalInvested ? colorGreen : colorRed },
+            { label: 'רווח / הפסד', value: sign + 'ILS ' + fmt(totalProfit) + '  (' + sign + totalPct.toFixed(2) + '%)', color: totalProfit >= 0 ? colorGreen : colorRed },
+        ];
+        const cardW = 85, cardH = 18, cardY = 27;
+        cards.forEach((c, i) => {
+            const cx = W - 10 - i * (cardW + 4);
+            pdf.setDrawColor(220, 220, 230);
+            pdf.setLineWidth(0.3);
+            pdf.roundedRect(cx - cardW, cardY, cardW, cardH, 2, 2, 'S');
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(7);
+            pdf.setTextColor(...colorGray);
+            rText(c.label, cx - 4, cardY + 5);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(10);
+            pdf.setTextColor(...c.color);
+            rText(c.value, cx - 4, cardY + 13);
+        });
+
+        // ── Table ──
+        const tY = cardY + cardH + 8;  // table start Y
+        const cols = [
+            { label: '#',            w: 10, align: 'center' },
+            { label: 'שם הקרן',      w: 70, align: 'right'  },
+            { label: 'מספר',         w: 22, align: 'right'  },
+            { label: 'השקעה (ILS)',   w: 42, align: 'right'  },
+            { label: 'ערך נוכחי (ILS)', w: 42, align: 'right' },
+            { label: 'רווח/הפסד (ILS)', w: 42, align: 'right' },
+            { label: '%',            w: 20, align: 'right'  },
+        ];
+        const totalColW = cols.reduce((s, c) => s + c.w, 0); // ~248
+        const tableX = (W - totalColW) / 2; // center table
+
+        // Header row
+        pdf.setFillColor(241, 245, 249);
+        pdf.rect(tableX, tY, totalColW, 8, 'F');
+        pdf.setDrawColor(203, 213, 225);
+        pdf.setLineWidth(0.3);
+        pdf.rect(tableX, tY, totalColW, 8, 'S');
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...colorGray);
+        let cx = tableX + totalColW;
+        cols.forEach(c => {
+            cx -= c.w;
+            rText(c.label, cx + c.w - 2, tY + 5.5);
+        });
+
+        // Data rows
+        const rowH = 9;
+        sorted.forEach((f, i) => {
+            const ry = tY + 8 + i * rowH;
+            if (i % 2 === 1) {
+                pdf.setFillColor(248, 250, 252);
+                pdf.rect(tableX, ry, totalColW, rowH, 'F');
+            }
+            pdf.setDrawColor(226, 232, 240);
+            pdf.setLineWidth(0.2);
+            pdf.line(tableX, ry + rowH, tableX + totalColW, ry + rowH);
+
+            const rank   = i + 1;
+            const rankLbl = rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : String(rank);
+            const s      = (f.profit || 0) >= 0 ? '+' : '';
+            const gc     = (f.profit||0) >= 0 ? colorGreen : colorRed;
+            const gp     = (f.profitPercent||0) >= 0 ? colorGreen : colorRed;
+
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(8);
+
+            const cells = [
+                { val: rankLbl,                               color: colorGray,  bold: false },
+                { val: f.name,                                color: colorDark,  bold: true  },
+                { val: f.number,                              color: colorGray,  bold: false },
+                { val: 'ILS ' + fmt(f.totalInvested),        color: colorDark,  bold: false },
+                { val: 'ILS ' + fmt(f.currentValue),         color: colorDark,  bold: false },
+                { val: s + 'ILS ' + fmt(f.profit||0),        color: gc,         bold: true  },
+                { val: s + (f.profitPercent||0).toFixed(2) + '%', color: gp,    bold: false },
+            ];
+
+            let cellX = tableX + totalColW;
+            cells.forEach((cell, ci) => {
+                cellX -= cols[ci].w;
+                pdf.setFont('helvetica', cell.bold ? 'bold' : 'normal');
+                pdf.setTextColor(...cell.color);
+                rText(cell.val, cellX + cols[ci].w - 2, ry + 6.2);
+            });
+        });
+
+        // ── Footer summary ──
+        const footY = tY + 8 + sorted.length * rowH + 6;
+        pdf.setDrawColor(245, 158, 11);
+        pdf.setLineWidth(0.6);
+        pdf.line(tableX, footY, tableX + totalColW, footY);
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(...colorDark);
+        rText('סיכום תיק: ' + sorted.length + ' קרנות', tableX + totalColW, footY + 7);
+
+        const summaryItems = [
+            { label: 'השקעה כוללת:', val: 'ILS ' + fmt(totalInvested), color: colorDark },
+            { label: 'ערך נוכחי:',   val: 'ILS ' + fmt(totalValue),    color: totalValue >= totalInvested ? colorGreen : colorRed },
+            { label: 'רווח/הפסד:',   val: sign + 'ILS ' + fmt(totalProfit) + ' (' + sign + totalPct.toFixed(2) + '%)', color: totalProfit >= 0 ? colorGreen : colorRed },
+        ];
+        let sumX = tableX + totalColW;
+        summaryItems.forEach(item => {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(7.5);
+            pdf.setTextColor(...colorGray);
+            rText(item.label, sumX - 2, footY + 14);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(9);
+            pdf.setTextColor(...item.color);
+            rText(item.val, sumX - 2, footY + 20);
+            sumX -= 80;
+        });
+
+        // ── Save ──
+        const dateStr = new Date().toLocaleDateString('he-IL').replace(/[/]/g, '-');
+        pdf.save('דוח-קרנות-' + dateStr + '.pdf');
 
     } catch(e) {
         showError('שגיאה ביצירת PDF: ' + e.message);
