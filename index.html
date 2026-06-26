@@ -285,9 +285,15 @@
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px">
             העלה קובץ CSV עם עמודות <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">english_name,buy_price</code> כפי שנוצר ע"י Perplexity
         </p>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px">
             <input type="file" id="csvFile" accept=".csv" style="flex:1; min-width:0; cursor:pointer">
             <button class="update-btn" onclick="importCSV()">⬆ עדכן מחירים</button>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <button onclick="exportCSV()" style="background:rgba(0,212,255,0.12);color:var(--accent);border:1px solid rgba(0,212,255,0.3);padding:8px 16px;border-radius:8px;font-size:13px;font-family:var(--sans);cursor:pointer;font-weight:600;">
+                ⬇ ייצא CSV עם מחירים נוכחיים
+            </button>
+            <span style="font-size:11px; color:var(--text-dim)">לשליחה ל-Perplexity לעדכון מחירים</span>
         </div>
         <div id="csvResult" style="margin-top:12px; font-size:13px; display:none"></div>
     </div>
@@ -891,6 +897,49 @@ window.downloadPDF = function() {
     w.document.open();
     w.document.write(html);
     w.document.close();
+};
+
+// ── Export CSV ───────────────────────────────────────
+window.exportCSV = function() {
+    const arr = Object.values(funds);
+    if (!arr.length) { showError('אין קרנות לייצוא'); return; }
+
+    // Build reverse map: fundId -> english_name
+    const CSV_NAME_MAP = {
+        '5131644': 'nasdaq 100 global',
+        '5134028': 'kati 25/75',
+        '5135074': 'telpazir markets',
+        '662577':  'bank hapoalim',
+        '5107420': 'avian 20/80',
+        '5114632': 'avivo midron+',
+        '5115514': 'sigma midron+20',
+        '5116033': 'analtest 20/80',
+        '5120613': 'sigma-meyusher',
+        '5121090': 'mor david +20%',
+        '5125679': 'sigma megavit+',
+        '5125794': 'eylim 20/80',
+    };
+
+    const rows = arr
+        .filter(f => CSV_NAME_MAP[f.id])
+        .map(f => `${CSV_NAME_MAP[f.id]},${(f.currentPrice || 0).toFixed(2)}`);
+
+    if (!rows.length) { showError('אין קרנות ממופות לייצוא'); return; }
+
+    const csv     = 'english_name,buy_price
+' + rows.join('
+');
+    const blob    = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url     = URL.createObjectURL(blob);
+    const a       = document.createElement('a');
+    const dateStr = new Date().toLocaleDateString('he-IL').replace(/[/]/g, '-');
+    a.href        = url;
+    a.download    = `prices-${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    showInfo(`✅ CSV יוצא עם ${rows.length} קרנות`);
 };
 
 // ── Service Worker ────────────────────────────────────
