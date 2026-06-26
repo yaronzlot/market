@@ -926,9 +926,7 @@ window.exportCSV = function() {
 
     if (!rows.length) { showError('אין קרנות ממופות לייצוא'); return; }
 
-    const csv     = 'english_name,buy_price
-' + rows.join('
-');
+    const csv     = 'english_name,buy_price\n' + rows.join('\n');
     const blob    = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url     = URL.createObjectURL(blob);
     const a       = document.createElement('a');
