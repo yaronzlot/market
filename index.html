@@ -922,11 +922,11 @@ window.exportCSV = function() {
 
     const rows = arr
         .filter(f => CSV_NAME_MAP[f.id])
-        .map(f => `${CSV_NAME_MAP[f.id]},${(f.currentPrice || 0).toFixed(2)}`);
+        .map(f => `${CSV_NAME_MAP[f.id]},${(f.currentPrice || 0).toFixed(2)},${f.name}`);
 
     if (!rows.length) { showError('אין קרנות ממופות לייצוא'); return; }
 
-    const csv     = 'english_name,buy_price\n' + rows.join('\n');
+    const csv     = 'english_name,buy_price,hebrew_name\n' + rows.join('\n');
     const blob    = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url     = URL.createObjectURL(blob);
     const a       = document.createElement('a');
