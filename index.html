@@ -13,7 +13,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Heebo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-
     <style>
         :root {
             --bg: #0a0e17;
@@ -197,22 +196,6 @@
         #chartDiv { height: 320px; }
 
         .loading { text-align: center; color: var(--text-dim); padding: 20px; font-size: 13px; }
-
-
-
-        .report-btn {
-            background: rgba(245,158,11,0.15) !important;
-            color: var(--yellow) !important;
-            border: 1px solid rgba(245,158,11,0.35) !important;
-            padding: 5px 10px !important;
-            font-size: 11px !important;
-            border-radius: 6px !important;
-            font-family: var(--mono) !important;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .report-btn:hover { background: rgba(245,158,11,0.25) !important; }
-
     </style>
 </head>
 <body>
@@ -244,7 +227,6 @@
                 <div class="sync-dot" id="syncDot"></div>
                 <span id="syncText">מתחבר...</span>
             </div>
-            <button class="report-btn" id="pdfBtn" onclick="downloadPDF()">📄 דו"ח PDF</button>
             <button class="logout-btn" onclick="logout()">
                 יציאה ↩
             </button>
@@ -285,15 +267,9 @@
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px">
             העלה קובץ CSV עם עמודות <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">english_name,buy_price</code> כפי שנוצר ע"י Perplexity
         </p>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
             <input type="file" id="csvFile" accept=".csv" style="flex:1; min-width:0; cursor:pointer">
             <button class="update-btn" onclick="importCSV()">⬆ עדכן מחירים</button>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-            <button onclick="exportCSV()" style="background:rgba(0,212,255,0.12);color:var(--accent);border:1px solid rgba(0,212,255,0.3);padding:8px 16px;border-radius:8px;font-size:13px;font-family:var(--sans);cursor:pointer;font-weight:600;">
-                ⬇ ייצא CSV עם מחירים נוכחיים
-            </button>
-            <span style="font-size:11px; color:var(--text-dim)">לשליחה ל-Perplexity לעדכון מחירים</span>
         </div>
         <div id="csvResult" style="margin-top:12px; font-size:13px; display:none"></div>
     </div>
@@ -314,7 +290,6 @@
 </div><!-- /container -->
 </div><!-- /appScreen -->
 
-<!-- Report Modal -->
 <!-- Chart Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
     <div class="modal">
@@ -326,8 +301,6 @@
         <div id="historyTable" style="margin-top:14px"></div>
     </div>
 </div>
-
-
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -722,20 +695,22 @@ function renderFunds() {
 
 // ── CSV Import ────────────────────────────────────────
 const CSV_NAME_MAP = {
-    'nasdaq 100 global':    '5131644',
-    'kati 25/75':           '5134028',
-    'telpazir markets':     '5135074',
-    'telpazir markets?':    '5135074',
-    'bank hapoalim':        '662577',
-    'avian 20/80':          '5107420',
-    'avivo midron+':        '5114632',
-    'sigma midron+20':      '5115514',
-    'analtest* 20/80':      '5116033',
-    'analtest 20/80':       '5116033',
-    'sigma-meyusher':       '5120613',
-    'mor david +20%':       '5121090',
-    'sigma megavit+':       '5125679',
-    'eylim 20/80':          '5125794',
+    'ibi ad 3 20/80':       '5107420',
+    'ibi medina 10+':       '5114632',
+    'sigma medina 20%+':    '5115514',
+    'analyst 20/80*':       '5116033',
+    'analyst 20/80':        '5116033',
+    'sigma - mani yashar':  '5120613',
+    'mor index med 20%+':   '5121090',
+    'sigma flexible*':      '5125679',
+    'sigma flexible':       '5125679',
+    'ayalim 20/80':         '5125794',
+    'ibi nasdaq 100*':      '5131644',
+    'ibi nasdaq 100':       '5131644',
+    'meitav 25/75':         '5134028',
+    'tachlit phlx sc*':     '5135074',
+    'tachlit phlx sc':      '5135074',
+    'bank hapoalim mar 1':  '662577',
 };
 
 window.importCSV = async function() {
@@ -829,116 +804,6 @@ function showInfo(msg) {
     clearTimeout(showInfo._t);
     showInfo._t = setTimeout(() => el.style.display = 'none', 4000);
 }
-
-// ── PDF Report ──────────────────────────────────────
-window.downloadPDF = function() {
-    const sorted = [...Object.values(funds)].sort((a, b) => (b.profit || 0) - (a.profit || 0));
-    if (!sorted.length) { showError('אין קרנות בתיק'); return; }
-
-    const totalInvested = sorted.reduce((s, f) => s + (f.totalInvested || 0), 0);
-    const totalValue    = sorted.reduce((s, f) => s + (f.currentValue  || 0), 0);
-    const totalProfit   = totalValue - totalInvested;
-    const totalPct      = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
-    const sign          = totalProfit >= 0 ? '+' : '';
-    const profitColor   = totalProfit >= 0 ? '#16a34a' : '#dc2626';
-    const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    const dateStr = new Date().toLocaleDateString('he-IL').replace(/[/]/g, '-');
-
-    const rows = sorted.map((f, i) => {
-        const s  = (f.profit||0) >= 0 ? '+' : '';
-        const gc = (f.profit||0) >= 0 ? '#16a34a' : '#dc2626';
-        const gp = (f.profitPercent||0) >= 0 ? '#16a34a' : '#dc2626';
-        return `<tr>
-            <td>${i+1}</td>
-            <td style="text-align:right;font-weight:bold;">${f.name.replace(/ /g,'&nbsp;')}</td>
-            <td style="color:#666;font-size:11px;">${f.number}</td>
-            <td>&#8362;${fmt(f.totalInvested)}</td>
-            <td>&#8362;${fmt(f.currentValue)}</td>
-            <td style="font-weight:bold;color:${gc};">${s}&#8362;${fmt(f.profit||0)}</td>
-            <td style="color:${gp};">${s}${(f.profitPercent||0).toFixed(2)}%</td>
-        </tr>`;
-    }).join('');
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>דוח-קרנות-${dateStr}</title>
-    <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; direction: rtl; padding: 20px; font-size: 13px; color: #1e293b; }
-        h1 { text-align: center; font-size: 20px; margin-bottom: 4px; }
-        .sub { text-align: center; color: #64748b; font-size: 11px; margin-bottom: 16px; }
-        .summary { border: 2px solid #f59e0b; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; display: table; width: 100%; }
-        .s-row { display: table-row; }
-        .s-lbl { display: table-cell; color: #64748b; padding: 3px 0; width: 40%; }
-        .s-val { display: table-cell; font-weight: bold; font-size: 15px; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th { background: #1e293b; color: white; padding: 9px 8px; border: 1px solid #334155; text-align: center; }
-        td { padding: 8px; border: 1px solid #e2e8f0; text-align: center; }
-        tr:nth-child(even) { background: #f8fafc; }
-        @page { size: A4 landscape; margin: 10mm; }
-        @media print { body { padding: 0; } }
-    </style>
-    </head><body>
-    <h1>&#128202; דו"ח תיק קרנות נאמנות</h1>
-    <div class="sub">נוצר ב: ${now}</div>
-    <div class="summary">
-        <div class="s-row"><span class="s-lbl">סה"כ השקעה:</span><span class="s-val">&#8362;${fmt(totalInvested)}</span></div>
-        <div class="s-row"><span class="s-lbl">ערך נוכחי:</span><span class="s-val" style="color:${totalValue>=totalInvested?'#16a34a':'#dc2626'}">&#8362;${fmt(totalValue)}</span></div>
-        <div class="s-row"><span class="s-lbl">רווח / הפסד:</span><span class="s-val" style="color:${profitColor}">${sign}&#8362;${fmt(totalProfit)}&nbsp;(${sign}${totalPct.toFixed(2)}%)</span></div>
-    </div>
-    <table>
-        <thead><tr><th>#</th><th>שם הקרן</th><th>מספר</th><th>השקעה</th><th>ערך נוכחי</th><th>רווח / הפסד</th><th>%</th></tr></thead>
-        <tbody>${rows}</tbody>
-    </table>
-    <script>setTimeout(()=>window.print(),400);<\/script>
-    </body></html>`;
-
-    const w = window.open('', '_blank', 'width=1200,height=800');
-    if (!w) { showError('אפשר חלונות קופצים בדפדפן ונסה שוב'); return; }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-};
-
-// ── Export CSV ───────────────────────────────────────
-window.exportCSV = function() {
-    const arr = Object.values(funds);
-    if (!arr.length) { showError('אין קרנות לייצוא'); return; }
-
-    // Build reverse map: fundId -> english_name
-    const CSV_NAME_MAP = {
-        '5131644': 'nasdaq 100 global',
-        '5134028': 'kati 25/75',
-        '5135074': 'telpazir markets',
-        '662577':  'bank hapoalim',
-        '5107420': 'avian 20/80',
-        '5114632': 'avivo midron+',
-        '5115514': 'sigma midron+20',
-        '5116033': 'analtest 20/80',
-        '5120613': 'sigma-meyusher',
-        '5121090': 'mor david +20%',
-        '5125679': 'sigma megavit+',
-        '5125794': 'eylim 20/80',
-    };
-
-    const rows = arr
-        .filter(f => CSV_NAME_MAP[f.id])
-        .map(f => `${CSV_NAME_MAP[f.id]},${(f.currentPrice || 0).toFixed(2)},${f.name}`);
-
-    if (!rows.length) { showError('אין קרנות ממופות לייצוא'); return; }
-
-    const csv     = 'english_name,buy_price,hebrew_name\n' + rows.join('\n');
-    const blob    = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url     = URL.createObjectURL(blob);
-    const a       = document.createElement('a');
-    const dateStr = new Date().toLocaleDateString('he-IL').replace(/[/]/g, '-');
-    a.href        = url;
-    a.download    = `prices-${dateStr}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    showInfo(`✅ CSV יוצא עם ${rows.length} קרנות`);
-};
 
 // ── Service Worker ────────────────────────────────────
 if ('serviceWorker' in navigator) {
