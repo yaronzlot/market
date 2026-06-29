@@ -199,7 +199,6 @@
     </style>
 </head>
 <body>
-<!-- Login Screen -->
 <div id="loginScreen" style="display:flex; min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:20px; text-align:center;">
     <div style="font-size:48px">🏦</div>
     <h2 style="font-size:1.4rem; font-weight:700">קרנות נאמנות</h2>
@@ -210,7 +209,6 @@
     </button>
 </div>
 
-<!-- App Screen -->
 <div id="appScreen" style="display:none">
 <div class="container">
 
@@ -236,7 +234,6 @@
     <div id="errorMsg" class="error-msg"></div>
     <div id="infoMsg" class="info-msg"></div>
 
-    <!-- Summary bar -->
     <div id="lastUpdateBar" style="display:none; text-align:center; font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:6px">
         עדכון אחרון: <span id="lastUpdateDate"></span>
     </div>
@@ -255,26 +252,35 @@
         <div id="totalProfitValue" style="font-size:22px; font-weight:700; font-family:var(--mono)"></div>
     </div>
 
-    <!-- Fund List -->
     <div class="section">
         <h2>📊 הקרנות שלי</h2>
         <div id="fundList"><div class="loading">טוען נתונים מ-Firebase...</div></div>
     </div>
 
-    <!-- CSV Import -->
     <div class="section">
-        <h2>📂 עדכון מחירים מקובץ CSV</h2>
+        <h2>📂 עדכון מחירים בהדבקה מהירה</h2>
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px">
-            העלה קובץ CSV עם עמודות <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">english_name,buy_price</code> כפי שנוצר ע"י Perplexity
+            הדבק כאן את שורות הנתונים (כולל שורת הכותרת <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">english_name,buy_price</code>) ולחץ על עדכן:
+        </p>
+        <textarea id="csvPasteText" rows="6" style="width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; font-family:var(--mono); margin-bottom:10px; font-size:13px;" placeholder="english_name,buy_price&#10;ibi ad 3 20/80,141.78"></textarea>
+        <div style="display:flex; gap:10px; justify-content: flex-end;">
+            <button class="update-btn" onclick="importPastedText()">⬆ עדכן מהדבקה</button>
+        </div>
+        <div id="pasteResult" style="margin-top:12px; font-size:13px; display:none"></div>
+    </div>
+
+    <div class="section">
+        <h2>📁 עדכון מחירים מקובץ CSV</h2>
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px">
+            לחלופין, העלה קובץ CSV עם עמודות <code style="background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px">english_name,buy_price</code> כפי שנוצר ע"י Perplexity
         </p>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
             <input type="file" id="csvFile" accept=".csv,.txt" style="flex:1; min-width:0; cursor:pointer">
-            <button class="update-btn" onclick="importCSV()">⬆ עדכן מחירים</button>
+            <button class="update-btn" onclick="importCSV()">⬆ עדכן מחירים מקובץ</button>
         </div>
         <div id="csvResult" style="margin-top:12px; font-size:13px; display:none"></div>
     </div>
 
-    <!-- Add Fund -->
     <div class="section">
         <h2>➕ הוסף קרן</h2>
         <div class="fund-preset-list" id="fundPresets"></div>
@@ -287,11 +293,7 @@
         </div>
     </div>
 
-</div><!-- /container -->
-</div><!-- /appScreen -->
-
-<!-- Chart Modal -->
-<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+</div></div><div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
     <div class="modal">
         <div class="modal-header">
             <div class="modal-title" id="modalTitle">היסטוריית מחירים</div>
@@ -533,282 +535,5 @@ window.showChart = async function(id) {
     document.getElementById('historyTable').innerHTML = '';
 
     try {
-        const q    = query(collection(db, FUNDS_COL, id, HISTORY_COL), orderBy('timestamp'));
-        const snap = await getDocs(q);
+        const q    = query
 
-        if (snap.empty) {
-            document.getElementById('chartDiv').innerHTML = '<div class="loading">אין היסטוריה עדיין — עדכן מחיר כדי להתחיל</div>';
-            return;
-        }
-
-        const dates  = [], prices = [], values = [], profits = [], profitShekels = [];
-        snap.forEach(d => {
-            const h = d.data();
-            dates.push(h.dateDisplay);
-            prices.push(h.price);
-            values.push(h.value);
-            profits.push(h.profitPercent);
-            profitShekels.push(h.profit || 0);
-        });
-
-        // צבע לפי רווח/הפסד סופי
-        const lastProfit = profits[profits.length - 1];
-        const lineColor  = lastProfit >= 0 ? '#00e676' : '#ff1744';
-        const lastProfitShekels = profitShekels[profitShekels.length - 1];
-        const profitSign = lastProfit >= 0 ? '+' : '';
-
-        // כותרת רווח/הפסד מעל הגרף
-        document.getElementById('chartDiv').innerHTML = `
-            <div style="text-align:center; padding:10px 0 4px; font-family:var(--mono)">
-                <span style="font-size:11px; color:var(--text-dim)">רווח / הפסד נוכחי &nbsp;</span>
-                <span style="font-size:18px; font-weight:700; color:${lineColor}">
-                    ${profitSign}₪${fmt(lastProfitShekels)} (${profitSign}${lastProfit.toFixed(2)}%)
-                </span>
-            </div>
-            <div id="plotlyChart"></div>`;
-
-        Plotly.newPlot('plotlyChart', [
-            { x: dates, y: prices, type: 'scatter', mode: 'lines+markers', name: 'מחיר יחידה (₪)', line: { color: '#00d4ff', width: 2 }, marker: { size: 6 } },
-            { x: dates, y: values, type: 'scatter', mode: 'lines+markers', name: 'ערך כולל (₪)', line: { color: lineColor, width: 2 }, marker: { size: 6 }, yaxis: 'y2' }
-        ], {
-            paper_bgcolor: '#111827', plot_bgcolor: '#111827',
-            font: { family: 'IBM Plex Mono', color: '#e2e8f0', size: 11 },
-            xaxis: { color: '#64748b', gridcolor: '#1f2d44' },
-            yaxis: { title: 'מחיר יחידה', color: '#64748b', gridcolor: '#1f2d44' },
-            yaxis2: { title: 'ערך כולל', overlaying: 'y', side: 'left', color: '#64748b' },
-            legend: { bgcolor: 'transparent' },
-            margin: { l: 60, r: 20, t: 10, b: 60 },
-            height: 260
-        }, { responsive: true, displayModeBar: false });
-
-        // History table עם עמודת רווח בשקלים
-        const rows = [...snap.docs].reverse().slice(0, 10).map(d => {
-            const h = d.data();
-            const sign  = h.profitPercent >= 0 ? '+' : '';
-            const color = h.profitPercent >= 0 ? 'var(--green)' : 'var(--red)';
-            const pShek = h.profit || 0;
-            return `<tr>
-                <td style="color:var(--text-dim);font-size:11px;padding:5px 4px">${h.dateDisplay}</td>
-                <td style="font-family:var(--mono);padding:5px 4px">₪${h.price.toFixed(2)}</td>
-                <td style="font-family:var(--mono);padding:5px 4px">₪${fmt(h.value)}</td>
-                <td style="font-family:var(--mono);color:${color};padding:5px 4px">${sign}₪${fmt(pShek)}<br><span style="font-size:10px">${sign}${h.profitPercent.toFixed(2)}%</span></td>
-            </tr>`;
-        }).join('');
-
-        document.getElementById('historyTable').innerHTML = `
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
-                <thead><tr style="color:var(--text-dim);font-size:11px;font-family:var(--mono)">
-                    <th style="text-align:right;padding:6px 4px">תאריך</th>
-                    <th style="text-align:right;padding:6px 4px">מחיר יחידה</th>
-                    <th style="text-align:right;padding:6px 4px">ערך כולל</th>
-                    <th style="text-align:right;padding:6px 4px">רווח/הפסד</th>
-                </tr></thead>
-                <tbody>${rows}</tbody>
-            </table>`;
-
-    } catch(e) {
-        document.getElementById('chartDiv').innerHTML = '<div class="loading">שגיאה בטעינת היסטוריה</div>';
-    }
-};
-
-window.closeChartModal = function() {
-    document.getElementById('modalOverlay').classList.remove('open');
-    const pc = document.getElementById('plotlyChart');
-    if (pc) Plotly.purge(pc);
-};
-window.closeModal = function(e) {
-    if (e.target === document.getElementById('modalOverlay')) window.closeChartModal();
-};
-
-// ── Render ────────────────────────────────────────────
-function renderFunds() {
-    const list    = document.getElementById('fundList');
-    const summary = document.getElementById('fundSummary');
-    const arr     = Object.values(funds);
-
-    if (arr.length === 0) {
-        list.innerHTML = '<p class="empty-state">אין קרנות — הוסף קרן למעלה</p>';
-        summary.style.display = 'none';
-        return;
-    }
-
-    let totalValue = 0, totalInvested = 0;
-
-    list.innerHTML = arr.map(f => {
-        totalValue    += f.currentValue;
-        totalInvested += f.totalInvested;
-
-        const pClass = f.profit >= 0 ? 'green' : 'red';
-        const pSign  = f.profit >= 0 ? '+' : '';
-        const lastUpd = f.lastUpdated || 'טרם עודכן';
-
-        return `<div class="fund-item">
-            <div class="fund-header">
-                <div>
-                    <div class="fund-name">${escHtml(f.name)}</div>
-                    <div class="fund-meta">מס׳ ${f.number} · ${f.units} יחידות @ ₪${(f.buyPrice||0).toFixed(2)}</div>
-                    <div class="last-update">${lastUpd}</div>
-                </div>
-                <div class="fund-actions-top">
-                    <button class="chart-btn sm" onclick="showChart('${f.id}')">📈 גרף</button>
-                    <button class="danger sm" onclick="removeFund('${f.id}')">⨉</button>
-                </div>
-            </div>
-            <div class="fund-stats">
-                <div>
-                    <div class="stat-label">ערך נוכחי</div>
-                    <div class="stat-value accent">₪${fmt(f.currentValue)}</div>
-                </div>
-                <div>
-                    <div class="stat-label">השקעה</div>
-                    <div class="stat-value">₪${fmt(f.totalInvested)}</div>
-                </div>
-                <div>
-                    <div class="stat-label">רווח/הפסד</div>
-                    <div class="stat-value ${pClass}">${pSign}₪${fmt(f.profit||0)}<br><span style="font-size:12px">${pSign}${(f.profitPercent||0).toFixed(2)}%</span></div>
-                </div>
-            </div>
-            <div class="fund-update">
-                <input type="number" id="price_${f.id}" value="${(f.currentPrice||0).toFixed(2)}" step="any" placeholder="מחיר יחידה חדש">
-                <button class="update-btn sm" onclick="updatePrice('${f.id}')">עדכן מחיר</button>
-                <span class="update-hint">מחיר ממיטב →</span>
-            </div>
-        </div>`;
-    }).join('');
-
-    summary.style.display = 'grid';
-    document.getElementById('totalInvested').textContent = `₪${fmt(totalInvested)}`;
-    const valEl = document.getElementById('totalValue');
-    valEl.textContent = `₪${fmt(totalValue)}`;
-    valEl.style.color = totalValue >= totalInvested ? 'var(--green)' : 'var(--red)';
-
-    const profit    = totalValue - totalInvested;
-    const profitPct = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
-    const sign      = profit >= 0 ? '+' : '';
-    const color     = profit >= 0 ? 'var(--green)' : 'var(--red)';
-    const profitBar = document.getElementById('totalProfitBar');
-    const profitEl  = document.getElementById('totalProfitValue');
-    profitBar.style.display = 'block';
-    profitEl.style.color    = color;
-    profitEl.textContent    = `${sign}₪${fmt(profit)} (${sign}${profitPct.toFixed(2)}%)`;
-}
-
-// ── CSV Import ────────────────────────────────────────
-const CSV_NAME_MAP = {
-    'ibi ad 3 20/80':       '5107420',
-    'ibi medina 10+':       '5114632',
-    'sigma medina 20%+':    '5115514',
-    'analyst 20/80*':       '5116033',
-    'analyst 20/80':        '5116033',
-    'sigma - mani yashar':  '5120613',
-    'mor index med 20%+':   '5121090',
-    'sigma flexible*':      '5125679',
-    'sigma flexible':       '5125679',
-    'ayalim 20/80':         '5125794',
-    'ibi nasdaq 100*':      '5131644',
-    'ibi nasdaq 100':       '5131644',
-    'meitav 25/75':         '5134028',
-    'tachlit phlx sc*':     '5135074',
-    'tachlit phlx sc':      '5135074',
-    'bank hapoalim mar 1':  '662577',
-};
-
-window.importCSV = async function() {
-    const file = document.getElementById('csvFile').files[0];
-    if (!file) return showError('אנא בחר קובץ CSV');
-
-    const text = await file.text();
-    const lines = text.trim().split('\n').slice(1); // skip header
-
-    let updated = 0, notFound = [], errors = [];
-
-    for (const line of lines) {
-        if (!line.trim()) continue;
-        const parts = line.split(',');
-        if (parts.length < 2) continue;
-
-        const csvName  = parts[0].trim().toLowerCase();
-        const price    = parseFloat(parts[1].trim());
-
-        if (isNaN(price) || price <= 0) continue;
-
-        const fundId = CSV_NAME_MAP[csvName];
-        if (!fundId) { notFound.push(parts[0].trim()); continue; }
-
-        const fund = funds[fundId];
-        if (!fund) { notFound.push(parts[0].trim() + ' (לא ברשימה)'); continue; }
-
-        try {
-            const newValue  = price * fund.units;
-            const profit    = newValue - fund.totalInvested;
-            const profitPct = (profit / fund.totalInvested) * 100;
-            const nowDisplay = new Date().toLocaleString('he-IL');
-
-            await setDoc(doc(db, FUNDS_COL, fundId), {
-                ...fund,
-                currentPrice: price,
-                currentValue: newValue,
-                profit, profitPercent: profitPct,
-                lastUpdated: nowDisplay
-            });
-
-            await addDoc(collection(db, FUNDS_COL, fundId, HISTORY_COL), {
-                price, value: newValue, profit,
-                profitPercent: profitPct,
-                timestamp: new Date().toISOString(),
-                dateDisplay: nowDisplay
-            });
-
-            updated++;
-        } catch(e) {
-            errors.push(parts[0].trim());
-        }
-    }
-
-    const resultEl = document.getElementById('csvResult');
-    resultEl.style.display = 'block';
-
-    let msg = `<span style="color:var(--green)">✅ עודכנו ${updated} קרנות</span>`;
-    if (notFound.length > 0) msg += `<br><span style="color:var(--yellow)">⚠️ לא נמצאו: ${notFound.join(', ')}</span>`;
-    if (errors.length > 0)   msg += `<br><span style="color:var(--red)">❌ שגיאות: ${errors.join(', ')}</span>`;
-    resultEl.innerHTML = msg;
-
-    if (updated > 0) {
-        const now = new Date().toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-        document.getElementById('lastUpdateDate').textContent = now;
-        document.getElementById('lastUpdateBar').style.display = 'block';
-        // שמור ב-Firebase
-        await setDoc(doc(db, 'meta', 'lastCsvUpdate'), { date: now });
-    }
-
-    document.getElementById('csvFile').value = '';
-};
-
-// ── Helpers ───────────────────────────────────────────
-function clearForm() {
-    ['fundNumber','fundName','fundUnits','fundBuyPrice'].forEach(id => document.getElementById(id).value = '');
-    document.querySelectorAll('.fund-preset').forEach(b => b.classList.remove('selected'));
-}
-function fmt(n) { return Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function showError(msg) {
-    const el = document.getElementById('errorMsg');
-    el.textContent = msg; el.style.display = 'block';
-    clearTimeout(showError._t);
-    showError._t = setTimeout(() => el.style.display = 'none', 6000);
-}
-function showInfo(msg) {
-    const el = document.getElementById('infoMsg');
-    el.textContent = msg; el.style.display = 'block';
-    clearTimeout(showInfo._t);
-    showInfo._t = setTimeout(() => el.style.display = 'none', 4000);
-}
-
-// ── Service Worker ────────────────────────────────────
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/market/sw.js');
-}
-</script>
-</body>
-</html>
